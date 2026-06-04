@@ -88,36 +88,6 @@ switch ($Stage) {
         if ($PSCmdlet.ShouldProcess($Context.NodeExportPath, "Export npm global packages")) {
             $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $Context.NodeExportPath -Encoding UTF8
         }
-
-        # Detect outdated npm packages
-        Write-Host "Checking for npm updates..."
-        $upgradesPath = Join-Path $Context.ExportPath "node.upgrades.json"
-        $outdatedRaw = & npm outdated -g --json 2>$null
-        $upgrades = @()
-
-        if ($outdatedRaw) {
-            try {
-                $outdatedParsed = $outdatedRaw | ConvertFrom-Json
-                foreach ($prop in $outdatedParsed.PSObject.Properties) {
-                    $upgrades += [ordered]@{
-                        id        = [string]$prop.Name
-                        installed = [string]$prop.Value.current
-                        available = [string]$prop.Value.latest
-                    }
-                }
-            }
-            catch {
-                # npm outdated returns non-JSON when no outdated packages
-            }
-        }
-
-        if ($upgrades.Count -gt 0) {
-            $upgrades | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
-            Write-Host "$($upgrades.Count) npm package(s) have upgrades available"
-        }
-        elseif (Test-Path -LiteralPath $upgradesPath) {
-            Remove-Item -LiteralPath $upgradesPath -Force
-        }
     }
 
     "Build" {
@@ -148,6 +118,40 @@ switch ($Stage) {
         if ($PSCmdlet.ShouldProcess($Context.NodeImportPath, "Write npm import manifest")) {
             $importModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Context.NodeImportPath -Encoding UTF8
         }
+
+        # Detect outdated npm packages (filtered to desired packages)
+        Write-Host "Checking for npm updates..."
+        $upgradesPath = Join-Path $Context.BuildPath "node.upgrades.json"
+        $outdatedRaw = & npm outdated -g --json 2>$null
+        $upgrades = @()
+
+        if ($outdatedRaw) {
+            try {
+                $outdatedParsed = $outdatedRaw | ConvertFrom-Json
+                foreach ($prop in $outdatedParsed.PSObject.Properties) {
+                    $pkgId = [string]$prop.Name
+                    # Only include if in desired state
+                    if ($names -contains $pkgId) {
+                        $upgrades += [ordered]@{
+                            id        = $pkgId
+                            installed = [string]$prop.Value.current
+                            available = [string]$prop.Value.latest
+                        }
+                    }
+                }
+            }
+            catch {
+                # npm outdated returns non-JSON when no outdated packages
+            }
+        }
+
+        if ($upgrades.Count -gt 0) {
+            $upgrades | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
+            Write-Host "$($upgrades.Count) npm package(s) have upgrades available"
+        }
+        elseif (Test-Path -LiteralPath $upgradesPath) {
+            Remove-Item -LiteralPath $upgradesPath -Force
+        }
     }
 
     "Execute" {
@@ -174,12 +178,11 @@ switch ($Stage) {
 
             $missingPkgs = @($desiredPkgs | Where-Object { $installedPkgs -notcontains $_ } | Sort-Object)
 
-            # Check for upgrades
-            $upgradesPath = Join-Path $Context.ExportPath "node.upgrades.json"
+            # Check for upgrades (from build stage)
+            $upgradesPath = Join-Path $Context.BuildPath "node.upgrades.json"
             $upgradeablePkgs = @()
             if (Test-Path -LiteralPath $upgradesPath) {
-                $allUpgrades = Get-Content -LiteralPath $upgradesPath -Raw | ConvertFrom-Json
-                $upgradeablePkgs = @($allUpgrades | Where-Object { $desiredPkgs -contains $_.id })
+                $upgradeablePkgs = @(Get-Content -LiteralPath $upgradesPath -Raw | ConvertFrom-Json)
             }
 
             $hasWork = $missingPkgs.Count -gt 0 -or $upgradeablePkgs.Count -gt 0
