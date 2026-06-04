@@ -347,11 +347,64 @@ switch ($Stage) {
             return
         }
 
-        if ($PSCmdlet.ShouldProcess($Context.WingetImportPath, "Import packages with Winget")) {
-            & winget import --import-file $Context.WingetImportPath --accept-package-agreements --accept-source-agreements
-            if ($LASTEXITCODE -ne 0) {
-                throw "Winget import failed with exit code $LASTEXITCODE."
+        # Diff desired vs installed so we only attempt packages that are actually missing
+        $installedWinget = @()
+        $installedMsstore = @()
+        if (Test-Path -LiteralPath $Context.WingetExportPath) {
+            $exportDoc = Get-Content -LiteralPath $Context.WingetExportPath -Raw | ConvertFrom-Json
+            $installedWinget  = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget'  } | ForEach-Object { $_.Packages.PackageIdentifier })
+            $installedMsstore = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages.PackageIdentifier })
+        }
+
+        $missingWinget  = @($desiredWinget  | Where-Object { $installedWinget  -notcontains $_ } | Sort-Object)
+        $missingMsstore = @($desiredMsstore | Where-Object { $installedMsstore -notcontains $_ } | Sort-Object)
+
+        $upgradesPath = Join-Path $Context.BuildPath "winget.upgrades.json"
+        $upgradeableWinget = @()
+        if (Test-Path -LiteralPath $upgradesPath) {
+            $upgradeableWinget = @(Get-Content -LiteralPath $upgradesPath -Raw | ConvertFrom-Json)
+        }
+
+        $failed = @()
+
+        foreach ($pkg in $missingWinget) {
+            if ($PSCmdlet.ShouldProcess($pkg, "winget install (winget source)")) {
+                Write-Host "Installing $pkg..."
+                & winget install --id $pkg --source winget --accept-package-agreements --accept-source-agreements
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "Failed to install $pkg (exit code $LASTEXITCODE)"
+                    $failed += $pkg
+                }
             }
+        }
+
+        foreach ($pkg in $missingMsstore) {
+            if ($PSCmdlet.ShouldProcess($pkg, "winget install (msstore source)")) {
+                Write-Host "Installing $pkg..."
+                & winget install --id $pkg --source msstore --accept-package-agreements --accept-source-agreements
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "Failed to install $pkg (exit code $LASTEXITCODE)"
+                    $failed += $pkg
+                }
+            }
+        }
+
+        foreach ($pkg in $upgradeableWinget) {
+            if ($PSCmdlet.ShouldProcess($pkg.id, "winget upgrade")) {
+                Write-Host "Upgrading $($pkg.id) ($($pkg.installed) -> $($pkg.available))..."
+                & winget upgrade --id $pkg.id --accept-package-agreements --accept-source-agreements
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "Failed to upgrade $($pkg.id) (exit code $LASTEXITCODE)"
+                    $failed += $pkg.id
+                }
+            }
+        }
+
+        if ($missingWinget.Count -eq 0 -and $missingMsstore.Count -eq 0 -and $upgradeableWinget.Count -eq 0) {
+            Write-Host "All winget packages are installed and up to date"
+        }
+        elseif ($failed.Count -gt 0) {
+            Write-Warning "$($failed.Count) package(s) failed: $($failed -join ', ')"
         }
     }
 }

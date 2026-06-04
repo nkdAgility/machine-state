@@ -13,9 +13,24 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Assert-NpmAvailable {
+function Invoke-RefreshPath {
+    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" +
+                [System.Environment]::GetEnvironmentVariable("PATH", "User")
+}
+
+function Install-NodeIfMissing {
+    if (Get-Command npm -ErrorAction SilentlyContinue) { return }
+
+    Write-Host "Node.js/npm not found - installing via winget..."
+    & winget install --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install Node.js via winget (exit code $LASTEXITCODE)."
+    }
+
+    Invoke-RefreshPath
+
     if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-        throw "npm was not found on PATH. Install Node.js/npm before running stage '$Stage'."
+        throw "npm still not found on PATH after installing Node.js. Open a new terminal and re-run."
     }
 }
 
@@ -64,12 +79,13 @@ function Get-SectionPackages {
 
 switch ($Stage) {
     "Export" {
-        Assert-NpmAvailable
+        Install-NodeIfMissing
         New-DirectoryIfMissing -Path $Context.ExportPath
 
-        $raw = & npm list -g --depth=0 --json
+        $raw = & npm list -g --depth=0 --json 2>$null
+        # npm exits non-zero when the global prefix directory doesn't exist yet; treat as empty
         if ($LASTEXITCODE -ne 0) {
-            throw "npm global export failed with exit code $LASTEXITCODE."
+            $raw = '{"dependencies":{}}'
         }
 
         $parsed = $raw | ConvertFrom-Json
@@ -119,43 +135,47 @@ switch ($Stage) {
             $importModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Context.NodeImportPath -Encoding UTF8
         }
 
-        # Detect outdated npm packages (filtered to desired packages)
-        Write-Host "Checking for npm updates..."
-        $upgradesPath = Join-Path $Context.BuildPath "node.upgrades.json"
-        $outdatedRaw = & npm outdated -g --json 2>$null
-        $upgrades = @()
+        # Detect outdated npm packages (filtered to desired packages) - skip if npm not available yet
+        if (Get-Command npm -ErrorAction SilentlyContinue) {
+            Write-Host "Checking for npm updates..."
+            $upgradesPath = Join-Path $Context.BuildPath "node.upgrades.json"
+            $outdatedRaw = & npm outdated -g --json 2>$null
+            $upgrades = @()
 
-        if ($outdatedRaw) {
-            try {
-                $outdatedParsed = $outdatedRaw | ConvertFrom-Json
-                foreach ($prop in $outdatedParsed.PSObject.Properties) {
-                    $pkgId = [string]$prop.Name
-                    # Only include if in desired state
-                    if ($names -contains $pkgId) {
-                        $upgrades += [ordered]@{
-                            id        = $pkgId
-                            installed = [string]$prop.Value.current
-                            available = [string]$prop.Value.latest
+            if ($outdatedRaw) {
+                try {
+                    $outdatedParsed = $outdatedRaw | ConvertFrom-Json
+                    foreach ($prop in $outdatedParsed.PSObject.Properties) {
+                        $pkgId = [string]$prop.Name
+                        if ($names -contains $pkgId) {
+                            $upgrades += [ordered]@{
+                                id        = $pkgId
+                                installed = [string]$prop.Value.current
+                                available = [string]$prop.Value.latest
+                            }
                         }
                     }
                 }
+                catch {
+                    # npm outdated returns non-JSON when no outdated packages
+                }
             }
-            catch {
-                # npm outdated returns non-JSON when no outdated packages
-            }
-        }
 
-        if ($upgrades.Count -gt 0) {
-            $upgrades | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
-            Write-Host "$($upgrades.Count) npm package(s) have upgrades available"
+            if ($upgrades.Count -gt 0) {
+                $upgrades | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
+                Write-Host "$($upgrades.Count) npm package(s) have upgrades available"
+            }
+            elseif (Test-Path -LiteralPath $upgradesPath) {
+                Remove-Item -LiteralPath $upgradesPath -Force
+            }
         }
-        elseif (Test-Path -LiteralPath $upgradesPath) {
-            Remove-Item -LiteralPath $upgradesPath -Force
+        else {
+            Write-Host "npm not available - skipping upgrade check"
         }
     }
 
     "Execute" {
-        Assert-NpmAvailable
+        Install-NodeIfMissing
 
         if (-not (Test-Path -LiteralPath $Context.NodeImportPath)) {
             throw "npm import manifest was not found at '$($Context.NodeImportPath)'. Run build first."
@@ -169,7 +189,6 @@ switch ($Stage) {
         }
 
         if ($WhatIfPreference) {
-            # Compare with export to show only what's actually missing
             $installedPkgs = @()
             if (Test-Path -LiteralPath $Context.NodeExportPath) {
                 $exportDoc = Get-Content -LiteralPath $Context.NodeExportPath -Raw | ConvertFrom-Json
@@ -178,7 +197,6 @@ switch ($Stage) {
 
             $missingPkgs = @($desiredPkgs | Where-Object { $installedPkgs -notcontains $_ } | Sort-Object)
 
-            # Check for upgrades (from build stage)
             $upgradesPath = Join-Path $Context.BuildPath "node.upgrades.json"
             $upgradeablePkgs = @()
             if (Test-Path -LiteralPath $upgradesPath) {

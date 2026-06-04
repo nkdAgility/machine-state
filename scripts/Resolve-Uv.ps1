@@ -13,9 +13,24 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Assert-UvAvailable {
+function Invoke-RefreshPath {
+    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" +
+                [System.Environment]::GetEnvironmentVariable("PATH", "User")
+}
+
+function Install-UvIfMissing {
+    if (Get-Command uv -ErrorAction SilentlyContinue) { return }
+
+    Write-Host "uv not found - installing via winget..."
+    & winget install --id astral-sh.uv --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to install uv via winget (exit code $LASTEXITCODE)."
+    }
+
+    Invoke-RefreshPath
+
     if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-        throw "uv was not found on PATH. Install uv before running stage '$Stage'."
+        throw "uv still not found on PATH after installing. Open a new terminal and re-run."
     }
 }
 
@@ -64,7 +79,7 @@ function Get-SectionPackages {
 
 switch ($Stage) {
     "Export" {
-        Assert-UvAvailable
+        Install-UvIfMissing
         New-DirectoryIfMissing -Path $Context.ExportPath
 
         $exportModel = [ordered]@{
@@ -147,7 +162,7 @@ switch ($Stage) {
     }
 
     "Execute" {
-        Assert-UvAvailable
+        Install-UvIfMissing
 
         if (-not (Test-Path -LiteralPath $Context.UvImportPath)) {
             throw "uv import manifest was not found at '$($Context.UvImportPath)'. Run build first."
@@ -161,7 +176,6 @@ switch ($Stage) {
         }
 
         if ($WhatIfPreference) {
-            # Compare with export to show only what's actually missing
             $installedPkgs = @()
             if (Test-Path -LiteralPath $Context.UvExportPath) {
                 $exportDoc = Get-Content -LiteralPath $Context.UvExportPath -Raw | ConvertFrom-Json

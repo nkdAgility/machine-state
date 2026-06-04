@@ -385,9 +385,6 @@ winget:
     - id: Sonos.Controller
       required: true
       name: Sonos.Controller
-    - id: Spotify.Spotify
-      required: true
-      name: Spotify.Spotify
     - id: StrawberryPerl.StrawberryPerl
       required: true
       name: StrawberryPerl.StrawberryPerl
