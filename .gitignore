@@ -1,0 +1,15 @@
+working/*
+!working/.gitkeep
+
+*.log
+*.tmp
+
+# Secrets and credentials
+*.key
+*.pem
+*.pfx
+*.env
+secrets.*
+credentials.*
+id_rsa
+id_ed25519

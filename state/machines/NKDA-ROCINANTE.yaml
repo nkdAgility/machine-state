@@ -1,0 +1,15 @@
+name: NKDA-ROCINANTE
+platform: win
+architecture: arm64
+
+state:
+  - ../win/windows-common.yaml
+  - ../win/windows-arm64.yaml
+
+scripts:
+  - Resolve-Winget.ps1
+
+winget:
+  packages:
+    winget: []
+    msstore: []

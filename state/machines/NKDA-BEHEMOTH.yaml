@@ -1,0 +1,28 @@
+name: NKDA-BEHEMOTH
+platform: win
+architecture: x64
+
+state:
+  - ../win/windows-common.yaml
+  - ../win/windows-x64.yaml
+
+scripts:
+  - Resolve-Winget.ps1
+
+winget:
+  packages:
+    winget:
+      - id: Nvidia.CUDA
+        name: NVIDIA CUDA Toolkit
+        description: NVIDIA CUDA development toolkit.
+        required: true
+
+      - id: Nvidia.PhysX
+        name: NVIDIA PhysX
+        description: NVIDIA PhysX runtime.
+        required: true
+
+      - id: OBSProject.OBSStudio
+        name: OBS Studio
+        description: Video recording and streaming software.
+        required: true

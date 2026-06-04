@@ -1,0 +1,47 @@
+name: windows-common
+platform: win
+
+winget:
+  packages:
+    winget:
+      - id: Git.Git
+        name: Git
+        description: Git version control system.
+        required: true
+
+      - id: Microsoft.PowerShell
+        name: PowerShell
+        description: PowerShell 7 shell and scripting runtime.
+        required: true
+
+      - id: Microsoft.VisualStudioCode
+        name: Visual Studio Code
+        description: Code editor.
+        required: true
+
+      - id: GitHub.cli
+        name: GitHub CLI
+        description: GitHub command-line interface.
+        required: true
+
+      - id: Microsoft.AzureCLI
+        name: Azure CLI
+        description: Command-line tools for Microsoft Azure.
+        required: true
+
+      - id: Microsoft.WindowsTerminal
+        name: Windows Terminal
+        description: Modern terminal application for Windows.
+        required: true
+
+      - id: JanDeDobbeleer.OhMyPosh
+        name: Oh My Posh
+        description: Prompt theme engine.
+        required: true
+
+      - id: Microsoft.PowerToys
+        name: PowerToys
+        description: Microsoft PowerToys utilities.
+        required: true
+
+    msstore: []
