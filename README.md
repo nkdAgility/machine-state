@@ -18,28 +18,44 @@ The goal is to rebuild, update, export, and synchronize workstation state in a d
 - NKDA-BEHEMOTH (Windows x64)
 - NKDA-ROCINANTE (Windows ARM64)
 
+## What This Does
+
+1. **Record what is installed on this machine** → `capture`
+2. **Make this machine match stored config** → `apply`
+3. **Do both** → `sync`
+
 ## How to Run
 
 Run from repository root with PowerShell 7+:
 
 ```powershell
-./machine-state.ps1
-./machine-state.ps1 sync
-./machine-state.ps1 status
-./machine-state.ps1 validate
-./machine-state.ps1 merge -MachineName NKDA-BEHEMOTH
-./machine-state.ps1 build -MachineName NKDA-ROCINANTE
+./machine-state.ps1 capture   # Record current machine state
+./machine-state.ps1 apply     # Install everything from stored config
+./machine-state.ps1 sync      # Do both
 ```
 
-## Stages
+`-MachineName` is optional. If omitted, machine name is resolved from the current host.
 
-- export: Capture observed local state, including Winget export.
-- merge: Combine machine and shared YAML files into merged YAML and JSON.
-- build: Generate tool-specific import files from merged state.
-- execute: Run resolver scripts that apply desired state.
-- sync: Run export, merge, build, execute.
-- status: Display resolved machine, files, scripts, and paths.
-- validate: Validate state files and generated Winget import JSON shape.
+### Options
+
+```powershell
+./machine-state.ps1 apply -BuildOnly   # Prepare manifests but don't install
+./machine-state.ps1 status             # Show resolved machine and config
+./machine-state.ps1 validate           # Check state files are valid
+```
+
+## Commands
+
+| Command | What it does |
+|---------|--------------|
+| `capture` | Record what is currently installed on this machine |
+| `apply` | Install everything from stored config |
+| `apply -BuildOnly` | Prepare install manifests without installing |
+| `sync` | Capture then apply |
+| `status` | Show resolved machine, files, scripts, and paths |
+| `validate` | Check state files are valid |
+
+Legacy verbs (`export`, `merge`, `build`, `execute`) are still supported for backward compatibility.
 
 ## State Files
 
@@ -55,7 +71,7 @@ Shared files in state/win define reusable package sets.
 ## Winget Flow
 
 1. export runs Winget export to working/<MachineName>/export/winget.export.json.
-2. merge combines referenced state with machine inline state.
+2. merge resolves referenced desired state with machine inline desired state.
 3. build creates working/<MachineName>/build/winget.import.json.
 4. execute runs winget import using that generated import file.
 

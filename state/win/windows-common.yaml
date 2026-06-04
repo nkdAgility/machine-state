@@ -254,9 +254,6 @@ winget:
     - id: Microsoft.VisualStudio.2022.BuildTools
       name: Microsoft.VisualStudio.2022.BuildTools
       required: true
-    - id: Microsoft.VisualStudio.Enterprise
-      name: Microsoft.VisualStudio.Enterprise
-      required: true
     - id: Microsoft.VisualStudio.Enterprise.Insiders
       name: Microsoft.VisualStudio.Enterprise.Insiders
       required: true
@@ -386,6 +383,44 @@ winget:
     - id: Zoom.Zoom.EXE
       name: Zoom.Zoom.EXE
       required: true
+
+node:
+  packages:
+    npm:
+    - id: '@githubnext/github-copilot-cli'
+      name: '@githubnext/github-copilot-cli'
+      required: true
+    - id: codeburn
+      name: codeburn
+      required: true
+
+uv:
+  packages:
+    uv: []
+
 name: windows-common
 platform: win
+
+exclusions:
+  packages:
+    winget:
+      - Canonical.Ubuntu.1804
+      - Microsoft.DotNet.DesktopRuntime.6
+      - Microsoft.DotNet.Framework.DeveloperPack_4
+      - Microsoft.DotNet.Runtime.3_1
+      - Microsoft.DotNet.Runtime.Preview
+      - Microsoft.DotNet.SDK.8
+      - Microsoft.DotNet.SDK.9
+      - Microsoft.DotNet.SDK.Preview
+      - Microsoft.UI.Xaml.2.7
+      - Microsoft.VCRedist.2010.x86
+      - Microsoft.VCRedist.2013.x86
+      - Microsoft.WindowsAppRuntime.1.1
+      - Microsoft.WindowsAppRuntime.1.2
+      - Microsoft.WindowsAppRuntime.1.5
+      - Microsoft.WindowsAppRuntime.1.6
+      - Microsoft.WindowsAppRuntime.1.7
+      - Python.Python.3.9
+      - TechSmith.Snagit.2024
+    msstore: []
 

@@ -120,13 +120,13 @@ param(
 
     [string]$MachineName,
 
-    [switch]$WhatIf,
-
     [switch]$VerboseOutput
 )
 ```
 
 Use `[CmdletBinding(SupportsShouldProcess)]`.
+
+`-WhatIf` is provided by PowerShell via `SupportsShouldProcess` and does not need to be declared explicitly in the `param(...)` block.
 
 ## Machine Detection
 
@@ -163,6 +163,34 @@ Preferred behaviour:
 3. If not installed, print a clear error explaining the prerequisite.
 4. Do not silently install modules unless explicitly implemented with confirmation.
 
+## Exclusions
+
+Exclusions define installed packages that should never become part of desired state.
+
+Exclusions may be declared in any referenced YAML file:
+
+* machine files under `state/machines/`
+* shared files under `state/win/`
+
+Shape:
+
+```yaml
+exclusions:
+  packages:
+    winget:
+      - Microsoft.DotNet.SDK.9
+    msstore:
+      - XP89DCGQ3K6VLD
+```
+
+Rules:
+
+1. During merge, exclusions from all loaded state files are combined and deduplicated.
+2. Excluded package IDs are removed from merged desired state, even if present in common or machine package lists.
+3. Raw `winget export` output is still written unchanged to `working/<MachineName>/export/winget.export.json`.
+4. When converting/export snapshots into maintained YAML state, excluded IDs must be filtered out and never reintroduced.
+5. Shared exclusions should live in shared YAML files (for example `state/win/windows-common.yaml`) to avoid duplication across machine files.
+
 ## Machine YAML Shape
 
 Create `state/machines/NKDA-BEHEMOTH.yaml`:
@@ -178,6 +206,11 @@ state:
 
 scripts:
   - Resolve-Winget.ps1
+
+exclusions:
+  packages:
+    winget: []
+    msstore: []
 
 winget:
   packages:
@@ -211,6 +244,11 @@ state:
 
 scripts:
   - Resolve-Winget.ps1
+
+exclusions:
+  packages:
+    winget: []
+    msstore: []
 
 winget:
   packages:
@@ -447,7 +485,8 @@ Merge behaviour:
 3. Deduplicate by `id`.
 4. Sort packages by `id` for deterministic output.
 5. Preserve package metadata from the last occurrence if duplicates exist.
-6. Save merged output as YAML and JSON.
+6. Combine exclusions from all loaded state files (`state[]` files plus machine file), deduplicate exclusion IDs, and remove excluded package IDs from merged package lists.
+7. Save merged output as YAML and JSON.
 
 Expected output:
 
@@ -592,6 +631,9 @@ Do not make changes during `status`.
 8. Generated Winget JSON can be parsed.
 9. Generated Winget JSON has `Sources`.
 10. Generated Winget JSON has valid `PackageIdentifier` entries.
+11. Exclusion entries are non-empty IDs.
+12. Machine-local package IDs are unique across machine files (if duplicated across machines, move to shared state).
+13. Machine-local exclusion IDs are unique across machine files (if shared, move to shared state YAML).
 
 Do not execute installations during `validate`.
 
@@ -796,6 +838,8 @@ The implementation is complete when:
     * `merge`
     * `build`
     * `execute`
+  19. Exclusions declared in shared or machine YAML files are applied during merge/build so excluded IDs do not appear in merged state or generated Winget import JSON.
+  20. Excluded packages may still appear in raw export artifacts, but are filtered out when generating or refreshing desired state YAML.
 
 ```
 
