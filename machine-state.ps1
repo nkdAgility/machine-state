@@ -54,6 +54,9 @@ try {
         }
         "capture" {
             Invoke-StageExport -Context $context -MachineState $machineState
+            if (-not $ExportOnly) {
+                Invoke-StageIngest -Context $context -MachineState $machineState
+            }
         }
         "apply" {
             Invoke-StageMerge -Context $context

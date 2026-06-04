@@ -13,7 +13,15 @@ function Initialize-YamlSupport {
         throw "YAML support is required. Install module 'powershell-yaml' or use a PowerShell with ConvertFrom-Yaml and ConvertTo-Yaml available."
     }
 
-    Import-Module powershell-yaml -ErrorAction Stop
+    # Suppress WhatIf noise from module alias creation
+    $savedWhatIf = $WhatIfPreference
+    $script:WhatIfPreference = $false
+    try {
+        Import-Module powershell-yaml -ErrorAction Stop
+    }
+    finally {
+        $script:WhatIfPreference = $savedWhatIf
+    }
 
     if (-not (Get-Command ConvertFrom-Yaml -ErrorAction SilentlyContinue)) {
         throw "YAML support could not be loaded. Ensure ConvertFrom-Yaml and ConvertTo-Yaml are available."
@@ -488,7 +496,9 @@ function Invoke-ResolverScript {
         throw "Resolver script not found: $resolverPath"
     }
 
-    & $resolverPath -Stage $Stage -Context $Context -WhatIf:$WhatIfPreference
+    # Only pass -WhatIf to Execute stage - merge/build must run to prepare files
+    $passWhatIf = ($Stage -eq "Execute") -and $WhatIfPreference
+    & $resolverPath -Stage $Stage -Context $Context -WhatIf:$passWhatIf
 }
 
 function Invoke-StageExport {
@@ -505,16 +515,217 @@ function Invoke-StageExport {
     }
 }
 
+function Invoke-StageIngest {
+    param(
+        [Parameter(Mandatory)]
+        [pscustomobject]$Context,
+
+        [Parameter(Mandatory)]
+        [object]$MachineState
+    )
+
+    # Get the primary common state file path
+    $commonStateRelative = @($MachineState.state) | Select-Object -First 1
+    if (-not $commonStateRelative) {
+        Write-Warning "No shared state files configured - cannot ingest packages"
+        return
+    }
+
+    $commonStatePath = Join-Path (Split-Path -Parent $Context.MachineStatePath) $commonStateRelative
+    if (-not (Test-Path -LiteralPath $commonStatePath)) {
+        Write-Warning "Common state file not found: $commonStatePath"
+        return
+    }
+
+    $commonState = Read-YamlFile -Path $commonStatePath
+    $mergedState = Merge-MachineState -MachineStatePath $Context.MachineStatePath
+
+    # Get existing package IDs from merged state
+    $existingWingetIds = @(Get-SourcePackages -StateObject $mergedState -SourceName "winget" | ForEach-Object { Get-ObjectValue -Object $_ -Name "id" })
+    $existingMsstoreIds = @(Get-SourcePackages -StateObject $mergedState -SourceName "msstore" | ForEach-Object { Get-ObjectValue -Object $_ -Name "id" })
+    $existingNpmIds = @(Get-SectionPackages -StateObject $mergedState -SectionName "node" -SourceName "npm" | ForEach-Object { Get-ObjectValue -Object $_ -Name "id" })
+    $existingUvIds = @(Get-SectionPackages -StateObject $mergedState -SectionName "uv" -SourceName "uv" | ForEach-Object { Get-ObjectValue -Object $_ -Name "id" })
+
+    # Get all exclusions
+    $wingetExclusions = @(Get-CombinedExclusionIds -StateObjects @($commonState, $MachineState) -SourceName "winget")
+    $msstoreExclusions = @(Get-CombinedExclusionIds -StateObjects @($commonState, $MachineState) -SourceName "msstore")
+
+    $newPackages = @{
+        winget  = @()
+        msstore = @()
+        npm     = @()
+        uv      = @()
+    }
+
+    # Parse winget export
+    if (Test-Path -LiteralPath $Context.WingetExportPath) {
+        $wingetExport = Get-Content -LiteralPath $Context.WingetExportPath -Raw | ConvertFrom-Json
+
+        foreach ($source in @($wingetExport.Sources)) {
+            $sourceName = $source.SourceDetails.Name
+            if ($sourceName -notin @("winget", "msstore")) { continue }
+
+            foreach ($pkg in @($source.Packages)) {
+                $pkgId = $pkg.PackageIdentifier
+                if (-not $pkgId) { continue }
+
+                # Skip if excluded
+                if ($sourceName -eq "winget" -and $pkgId -in $wingetExclusions) { continue }
+                if ($sourceName -eq "msstore" -and $pkgId -in $msstoreExclusions) { continue }
+
+                # Skip if already exists
+                if ($sourceName -eq "winget" -and $pkgId -in $existingWingetIds) { continue }
+                if ($sourceName -eq "msstore" -and $pkgId -in $existingMsstoreIds) { continue }
+
+                $newPackages[$sourceName] += [ordered]@{
+                    id       = $pkgId
+                    name     = $pkgId
+                    required = $true
+                }
+            }
+        }
+    }
+
+    # Parse npm export
+    if (Test-Path -LiteralPath $Context.NodeExportPath) {
+        $npmExport = Get-Content -LiteralPath $Context.NodeExportPath -Raw | ConvertFrom-Json
+        foreach ($pkg in @($npmExport.packages)) {
+            $pkgId = if ($pkg -is [string]) { $pkg } else { $pkg.id }
+            if (-not $pkgId -or $pkgId -in $existingNpmIds) { continue }
+            $newPackages["npm"] += [ordered]@{
+                id       = $pkgId
+                name     = $pkgId
+                required = $true
+            }
+        }
+    }
+
+    # Parse uv export
+    if (Test-Path -LiteralPath $Context.UvExportPath) {
+        $uvExport = Get-Content -LiteralPath $Context.UvExportPath -Raw | ConvertFrom-Json
+        foreach ($pkg in @($uvExport.packages)) {
+            $pkgId = if ($pkg -is [string]) { $pkg } else { $pkg.id }
+            if (-not $pkgId -or $pkgId -in $existingUvIds) { continue }
+            $newPackages["uv"] += [ordered]@{
+                id       = $pkgId
+                name     = $pkgId
+                required = $true
+            }
+        }
+    }
+
+    # Count new packages
+    $totalNew = $newPackages["winget"].Count + $newPackages["msstore"].Count + $newPackages["npm"].Count + $newPackages["uv"].Count
+    if ($totalNew -eq 0) {
+        Write-Host "No new packages to ingest"
+        return
+    }
+
+    Write-Host "Found $totalNew new package(s) to add to state:"
+    if ($newPackages["winget"].Count -gt 0) { Write-Host "  winget: $($newPackages["winget"].Count)" }
+    if ($newPackages["msstore"].Count -gt 0) { Write-Host "  msstore: $($newPackages["msstore"].Count)" }
+    if ($newPackages["npm"].Count -gt 0) { Write-Host "  npm: $($newPackages["npm"].Count)" }
+    if ($newPackages["uv"].Count -gt 0) { Write-Host "  uv: $($newPackages["uv"].Count)" }
+
+    # Update common state with new packages
+    $updated = $false
+
+    # Winget packages
+    if ($newPackages["winget"].Count -gt 0) {
+        $wingetNode = Get-ObjectValue -Object $commonState -Name "winget"
+        if (-not $wingetNode) {
+            $commonState["winget"] = [ordered]@{ packages = [ordered]@{ winget = @() } }
+            $wingetNode = $commonState["winget"]
+        }
+        $packagesNode = Get-ObjectValue -Object $wingetNode -Name "packages"
+        if (-not $packagesNode) {
+            $wingetNode["packages"] = [ordered]@{ winget = @() }
+            $packagesNode = $wingetNode["packages"]
+        }
+        $wingetList = @(Get-ObjectValue -Object $packagesNode -Name "winget")
+        $wingetList += $newPackages["winget"]
+        $packagesNode["winget"] = @($wingetList | Sort-Object { Get-ObjectValue -Object $_ -Name "id" })
+        $updated = $true
+    }
+
+    # Msstore packages
+    if ($newPackages["msstore"].Count -gt 0) {
+        $wingetNode = Get-ObjectValue -Object $commonState -Name "winget"
+        if (-not $wingetNode) {
+            $commonState["winget"] = [ordered]@{ packages = [ordered]@{ msstore = @() } }
+            $wingetNode = $commonState["winget"]
+        }
+        $packagesNode = Get-ObjectValue -Object $wingetNode -Name "packages"
+        if (-not $packagesNode) {
+            $wingetNode["packages"] = [ordered]@{ msstore = @() }
+            $packagesNode = $wingetNode["packages"]
+        }
+        $msstoreList = @(Get-ObjectValue -Object $packagesNode -Name "msstore")
+        $msstoreList += $newPackages["msstore"]
+        $packagesNode["msstore"] = @($msstoreList | Sort-Object { Get-ObjectValue -Object $_ -Name "id" })
+        $updated = $true
+    }
+
+    # Npm packages
+    if ($newPackages["npm"].Count -gt 0) {
+        $nodeNode = Get-ObjectValue -Object $commonState -Name "node"
+        if (-not $nodeNode) {
+            $commonState["node"] = [ordered]@{ packages = [ordered]@{ npm = @() } }
+            $nodeNode = $commonState["node"]
+        }
+        $packagesNode = Get-ObjectValue -Object $nodeNode -Name "packages"
+        if (-not $packagesNode) {
+            $nodeNode["packages"] = [ordered]@{ npm = @() }
+            $packagesNode = $nodeNode["packages"]
+        }
+        $npmList = @(Get-ObjectValue -Object $packagesNode -Name "npm")
+        $npmList += $newPackages["npm"]
+        $packagesNode["npm"] = @($npmList | Sort-Object { Get-ObjectValue -Object $_ -Name "id" })
+        $updated = $true
+    }
+
+    # UV packages
+    if ($newPackages["uv"].Count -gt 0) {
+        $uvNode = Get-ObjectValue -Object $commonState -Name "uv"
+        if (-not $uvNode) {
+            $commonState["uv"] = [ordered]@{ packages = [ordered]@{ uv = @() } }
+            $uvNode = $commonState["uv"]
+        }
+        $packagesNode = Get-ObjectValue -Object $uvNode -Name "packages"
+        if (-not $packagesNode) {
+            $uvNode["packages"] = [ordered]@{ uv = @() }
+            $packagesNode = $uvNode["packages"]
+        }
+        $uvList = @(Get-ObjectValue -Object $packagesNode -Name "uv")
+        $uvList += $newPackages["uv"]
+        $packagesNode["uv"] = @($uvList | Sort-Object { Get-ObjectValue -Object $_ -Name "id" })
+        $updated = $true
+    }
+
+    if ($updated) {
+        Write-YamlFile -Path $commonStatePath -Value $commonState
+        Write-Host "Updated: $commonStatePath"
+    }
+}
+
 function Invoke-StageMerge {
     param(
         [Parameter(Mandatory)]
         [pscustomobject]$Context
     )
 
-    $mergedState = Merge-MachineState -MachineStatePath $Context.MachineStatePath
+    # Merge must run even in WhatIf mode so Execute stage can read the result
+    $savedWhatIf = $WhatIfPreference
+    $script:WhatIfPreference = $false
 
-    Write-YamlFile -Path $Context.MergedStateYaml -Value $mergedState
-    $mergedState | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $Context.MergedStateJson -Encoding UTF8
+    try {
+        $mergedState = Merge-MachineState -MachineStatePath $Context.MachineStatePath
+        Write-YamlFile -Path $Context.MergedStateYaml -Value $mergedState
+        $mergedState | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $Context.MergedStateJson -Encoding UTF8
+    }
+    finally {
+        $script:WhatIfPreference = $savedWhatIf
+    }
 }
 
 function Invoke-StageBuild {

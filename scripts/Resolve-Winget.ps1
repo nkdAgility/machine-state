@@ -149,21 +149,79 @@ switch ($Stage) {
         New-DirectoryIfMissing -Path $Context.ExportPath
 
         if ($PSCmdlet.ShouldProcess($Context.WingetExportPath, "Export Winget state")) {
-            & winget export --output $Context.WingetExportPath --accept-source-agreements
-            if ($LASTEXITCODE -ne 0) {
-                throw "Winget export failed with exit code $LASTEXITCODE."
+            $unavailablePath = Join-Path $Context.ExportPath "winget.unavailable.json"
+            $licensePath = Join-Path $Context.ExportPath "winget.license-required.json"
+
+            # Run winget export and capture stderr for unavailable/license warnings
+            $stderrFile = [System.IO.Path]::GetTempFileName()
+            try {
+                & winget export --output $Context.WingetExportPath --accept-source-agreements 2>$stderrFile
+                $exitCode = $LASTEXITCODE
+
+                # Parse stderr for warnings
+                $unavailable = @()
+                $licenseRequired = @()
+
+                if (Test-Path -LiteralPath $stderrFile) {
+                    $stderrLines = Get-Content -LiteralPath $stderrFile -ErrorAction SilentlyContinue
+                    foreach ($line in $stderrLines) {
+                        if ($line -match "Installed package is not available from any source:\s*(.+)") {
+                            $unavailable += [ordered]@{
+                                name   = $Matches[1].Trim()
+                                reason = "not available from any source"
+                            }
+                        }
+                        elseif ($line -match "Exported package requires license agreement to install:\s*(.+)") {
+                            $licenseRequired += [ordered]@{
+                                name   = $Matches[1].Trim()
+                                reason = "requires license agreement"
+                            }
+                        }
+                        else {
+                            # Echo other warnings to console
+                            Write-Warning $line
+                        }
+                    }
+                }
+
+                # Save unavailable packages
+                if ($unavailable.Count -gt 0) {
+                    $unavailable | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $unavailablePath -Encoding UTF8
+                    Write-Host "$($unavailable.Count) sideloaded/unavailable packages logged to winget.unavailable.json"
+                }
+                elseif (Test-Path -LiteralPath $unavailablePath) {
+                    Remove-Item -LiteralPath $unavailablePath -Force
+                }
+
+                # Save license-required packages
+                if ($licenseRequired.Count -gt 0) {
+                    $licenseRequired | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $licensePath -Encoding UTF8
+                    Write-Host "$($licenseRequired.Count) license-required packages logged to winget.license-required.json"
+                }
+                elseif (Test-Path -LiteralPath $licensePath) {
+                    Remove-Item -LiteralPath $licensePath -Force
+                }
+
+                if ($exitCode -ne 0) {
+                    throw "Winget export failed with exit code $exitCode."
+                }
+            }
+            finally {
+                if (Test-Path -LiteralPath $stderrFile) {
+                    Remove-Item -LiteralPath $stderrFile -Force -ErrorAction SilentlyContinue
+                }
             }
         }
     }
 
     "Build" {
-        if (-not (Test-Path -LiteralPath $Context.MergedStateYaml)) {
-            throw "Merged state file not found at '$($Context.MergedStateYaml)'. Run merge first."
+        if (-not (Test-Path -LiteralPath $Context.MergedStateJson)) {
+            throw "Merged state file not found at '$($Context.MergedStateJson)'. Run merge first."
         }
 
         New-DirectoryIfMissing -Path $Context.BuildPath
 
-        $mergedState = Get-Content -LiteralPath $Context.MergedStateYaml -Raw | ConvertFrom-Yaml
+        $mergedState = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
 
         $wingetPackages = @(Get-SourcePackages -StateObject $mergedState -SourceName "winget")
         $msstorePackages = @(Get-SourcePackages -StateObject $mergedState -SourceName "msstore")
@@ -192,6 +250,42 @@ switch ($Stage) {
 
         if (-not (Test-Path -LiteralPath $Context.WingetImportPath)) {
             throw "Winget import file was not found at '$($Context.WingetImportPath)'. Run build first."
+        }
+
+        $importDoc = Get-Content -LiteralPath $Context.WingetImportPath -Raw | ConvertFrom-Json
+        $desiredWinget = @($importDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget' } | ForEach-Object { $_.Packages.PackageIdentifier })
+        $desiredMsstore = @($importDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages.PackageIdentifier })
+
+        if ($WhatIfPreference) {
+            # Compare with export to show only what's actually missing
+            $installedWinget = @()
+            $installedMsstore = @()
+            if (Test-Path -LiteralPath $Context.WingetExportPath) {
+                $exportDoc = Get-Content -LiteralPath $Context.WingetExportPath -Raw | ConvertFrom-Json
+                $installedWinget = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget' } | ForEach-Object { $_.Packages.PackageIdentifier })
+                $installedMsstore = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages.PackageIdentifier })
+            }
+            else {
+                Write-Warning "No export found at $($Context.WingetExportPath) - run 'capture' first for accurate diff. Showing all desired packages."
+            }
+
+            $missingWinget = @($desiredWinget | Where-Object { $installedWinget -notcontains $_ } | Sort-Object)
+            $missingMsstore = @($desiredMsstore | Where-Object { $installedMsstore -notcontains $_ } | Sort-Object)
+
+            if ($missingWinget.Count -eq 0 -and $missingMsstore.Count -eq 0) {
+                Write-Host "All winget packages are already installed"
+            }
+            else {
+                if ($missingWinget.Count -gt 0) {
+                    Write-Host "Would install $($missingWinget.Count) winget package(s):"
+                    foreach ($pkg in $missingWinget) { Write-Host "  - $pkg" }
+                }
+                if ($missingMsstore.Count -gt 0) {
+                    Write-Host "Would install $($missingMsstore.Count) msstore package(s):"
+                    foreach ($pkg in $missingMsstore) { Write-Host "  - $pkg" }
+                }
+            }
+            return
         }
 
         if ($PSCmdlet.ShouldProcess($Context.WingetImportPath, "Import packages with Winget")) {

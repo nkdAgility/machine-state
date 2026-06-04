@@ -47,23 +47,25 @@ If PowerShell 7+ is already installed, run directly:
 ### Options
 
 ```powershell
-./machine-state.ps1 apply -BuildOnly   # Prepare manifests but don't install
-./machine-state.ps1 status             # Show resolved machine and config
-./machine-state.ps1 validate           # Check state files are valid
+./machine-state.ps1 capture -ExportOnly  # Record to working/ without updating state/
+./machine-state.ps1 apply -BuildOnly     # Prepare manifests but don't install
+./machine-state.ps1 apply -WhatIf        # Show what would be installed without doing it
+./machine-state.ps1 status               # Show resolved machine and config
+./machine-state.ps1 validate             # Check state files are valid
 ```
 
 ## Commands
 
 | Command | What it does |
 |---------|--------------|
-| `capture` | Record what is currently installed on this machine |
+| `capture` | Record current machine state and add new packages to stored config |
+| `capture -ExportOnly` | Record current state to working/ only, don't update stored config |
 | `apply` | Install everything from stored config |
 | `apply -BuildOnly` | Prepare install manifests without installing |
+| `apply -WhatIf` | Show what would be installed without doing it |
 | `sync` | Capture then apply |
 | `status` | Show resolved machine, files, scripts, and paths |
 | `validate` | Check state files are valid |
-
-Legacy verbs (`export`, `merge`, `build`, `execute`) are still supported for backward compatibility.
 
 ## State Files
 

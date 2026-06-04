@@ -91,13 +91,13 @@ switch ($Stage) {
     }
 
     "Build" {
-        if (-not (Test-Path -LiteralPath $Context.MergedStateYaml)) {
-            throw "Merged state file not found at '$($Context.MergedStateYaml)'. Run merge first."
+        if (-not (Test-Path -LiteralPath $Context.MergedStateJson)) {
+            throw "Merged state file not found at '$($Context.MergedStateJson)'. Run merge first."
         }
 
         New-DirectoryIfMissing -Path $Context.BuildPath
 
-        $mergedState = Get-Content -LiteralPath $Context.MergedStateYaml -Raw | ConvertFrom-Yaml
+        $mergedState = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
         $npmPackages = @(Get-SectionPackages -StateObject $mergedState -SectionName "node" -SourceName "npm")
 
         $names = @()
@@ -128,14 +128,34 @@ switch ($Stage) {
         }
 
         $manifest = Get-Content -LiteralPath $Context.NodeImportPath -Raw | ConvertFrom-Json
-        $packages = @($manifest.packages)
+        $desiredPkgs = @($manifest.packages)
 
-        if ($packages.Count -eq 0) {
+        if ($desiredPkgs.Count -eq 0) {
+            return
+        }
+
+        if ($WhatIfPreference) {
+            # Compare with export to show only what's actually missing
+            $installedPkgs = @()
+            if (Test-Path -LiteralPath $Context.NodeExportPath) {
+                $exportDoc = Get-Content -LiteralPath $Context.NodeExportPath -Raw | ConvertFrom-Json
+                $installedPkgs = @($exportDoc.packages | ForEach-Object { $_.id })
+            }
+
+            $missingPkgs = @($desiredPkgs | Where-Object { $installedPkgs -notcontains $_ } | Sort-Object)
+
+            if ($missingPkgs.Count -eq 0) {
+                Write-Host "All npm packages are already installed"
+            }
+            else {
+                Write-Host "Would install $($missingPkgs.Count) npm package(s):"
+                foreach ($pkg in $missingPkgs) { Write-Host "  - $pkg" }
+            }
             return
         }
 
         if ($PSCmdlet.ShouldProcess("npm global packages", "Install/upgrade npm packages")) {
-            & npm install -g @($packages)
+            & npm install -g @($desiredPkgs)
             if ($LASTEXITCODE -ne 0) {
                 throw "npm global install failed with exit code $LASTEXITCODE."
             }

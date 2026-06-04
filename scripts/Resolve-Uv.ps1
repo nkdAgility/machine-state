@@ -117,13 +117,13 @@ switch ($Stage) {
     }
 
     "Build" {
-        if (-not (Test-Path -LiteralPath $Context.MergedStateYaml)) {
-            throw "Merged state file not found at '$($Context.MergedStateYaml)'. Run merge first."
+        if (-not (Test-Path -LiteralPath $Context.MergedStateJson)) {
+            throw "Merged state file not found at '$($Context.MergedStateJson)'. Run merge first."
         }
 
         New-DirectoryIfMissing -Path $Context.BuildPath
 
-        $mergedState = Get-Content -LiteralPath $Context.MergedStateYaml -Raw | ConvertFrom-Yaml
+        $mergedState = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
         $uvPackages = @(Get-SectionPackages -StateObject $mergedState -SectionName "uv" -SourceName "uv")
 
         $names = @()
@@ -154,13 +154,33 @@ switch ($Stage) {
         }
 
         $manifest = Get-Content -LiteralPath $Context.UvImportPath -Raw | ConvertFrom-Json
-        $packages = @($manifest.packages)
+        $desiredPkgs = @($manifest.packages)
 
-        if ($packages.Count -eq 0) {
+        if ($desiredPkgs.Count -eq 0) {
             return
         }
 
-        foreach ($pkg in $packages) {
+        if ($WhatIfPreference) {
+            # Compare with export to show only what's actually missing
+            $installedPkgs = @()
+            if (Test-Path -LiteralPath $Context.UvExportPath) {
+                $exportDoc = Get-Content -LiteralPath $Context.UvExportPath -Raw | ConvertFrom-Json
+                $installedPkgs = @($exportDoc.packages | ForEach-Object { $_.id })
+            }
+
+            $missingPkgs = @($desiredPkgs | Where-Object { $installedPkgs -notcontains $_ } | Sort-Object)
+
+            if ($missingPkgs.Count -eq 0) {
+                Write-Host "All uv tools are already installed"
+            }
+            else {
+                Write-Host "Would install $($missingPkgs.Count) uv tool(s):"
+                foreach ($pkg in $missingPkgs) { Write-Host "  - $pkg" }
+            }
+            return
+        }
+
+        foreach ($pkg in $desiredPkgs) {
             if ($PSCmdlet.ShouldProcess($pkg, "Install/upgrade uv tool")) {
                 & uv tool install --upgrade $pkg
                 if ($LASTEXITCODE -ne 0) {
