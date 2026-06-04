@@ -11,5 +11,11 @@ scripts:
 
 winget:
   packages:
-    winget: []
-    msstore: []
+    winget:
+      - id: Microsoft.SurfaceApp
+        name: Microsoft.SurfaceApp
+        required: true
+
+    msstore:
+      []
+

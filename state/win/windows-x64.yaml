@@ -5,24 +5,22 @@ architecture: x64
 winget:
   packages:
     winget:
-      - id: Microsoft.VisualStudio.Enterprise.Insiders
-        name: Visual Studio Enterprise Insiders
-        description: Visual Studio Enterprise Insiders edition.
+      - id: Microsoft.DotNet.DesktopRuntime.8.x64
+        name: Microsoft.DotNet.DesktopRuntime.8.x64
         required: true
 
-      - id: Microsoft.DotNet.SDK.10
-        name: .NET SDK 10
-        description: .NET 10 SDK.
+      - id: Microsoft.VCRedist.2010.x64
+        name: Microsoft.VCRedist.2010.x64
         required: true
 
-      - id: Microsoft.DotNet.SDK.9
-        name: .NET SDK 9
-        description: .NET 9 SDK.
+      - id: Microsoft.VCRedist.2013.x64
+        name: Microsoft.VCRedist.2013.x64
         required: true
 
-      - id: Microsoft.DotNet.SDK.8
-        name: .NET SDK 8
-        description: .NET 8 SDK.
+      - id: Microsoft.VCRedist.2015+.x64
+        name: Microsoft.VCRedist.2015+.x64
         required: true
 
-    msstore: []
+    msstore:
+      []
+

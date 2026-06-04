@@ -13,16 +13,17 @@ winget:
   packages:
     winget:
       - id: Nvidia.CUDA
-        name: NVIDIA CUDA Toolkit
-        description: NVIDIA CUDA development toolkit.
+        name: Nvidia.CUDA
         required: true
 
       - id: Nvidia.PhysX
-        name: NVIDIA PhysX
-        description: NVIDIA PhysX runtime.
+        name: Nvidia.PhysX
         required: true
 
-      - id: OBSProject.OBSStudio
-        name: OBS Studio
-        description: Video recording and streaming software.
+      - id: Nvidia.VideoEffectsSDK.20xx-Turing
+        name: Nvidia.VideoEffectsSDK.20xx-Turing
         required: true
+
+    msstore:
+      []
+

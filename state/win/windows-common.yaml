@@ -1,47 +1,391 @@
+winget:
+  packages:
+    msstore:
+    - id: 9NBDXK71NK08
+      name: WhatsApp Beta
+      required: true
+    - id: 9NBLGGH6BZL3
+      name: GlobalProtect
+      required: true
+    - id: 9NF8H0H7WMLT
+      name: NVIDIA Control Panel
+      required: true
+    - id: 9NKSQGP7F2NH
+      name: WhatsApp
+      required: true
+    - id: 9NTXR16HNW1T
+      name: Power BI Desktop
+      required: true
+    - id: 9P1J8S7CCWWT
+      name: Microsoft Clipchamp
+      required: true
+    - id: 9P6J8N3K7TK4
+      name: Ultra Wide Screen Share 2.0
+      required: true
+    - id: 9PLM9XGG6VKS
+      name: Codex
+      required: true
+    - id: XP89DCGQ3K6VLD
+      name: Microsoft PowerToys
+      required: true
+    - id: XP8BT8DW290MPQ
+      name: Microsoft Teams
+      required: true
+    - id: XP9D25XXG3SV5X
+      name: Krisp
+      required: true
+    - id: XP9KHM4BK9FZ7Q
+      name: Visual Studio Code
+      required: true
+    - id: XP9M26RSCLNT88
+      name: TreeSize Free
+      required: true
+    - id: XPDM1ZW6815MQM
+      name: VLC
+      required: true
+    - id: XPFFVLPJRVQTKM
+      name: Comet Browser
+      required: true
+    winget:
+    - id: 7zip.7zip
+      name: 7zip.7zip
+      required: true
+    - id: AgileBits.1Password
+      name: AgileBits.1Password
+      required: true
+    - id: Anthropic.Claude
+      name: Anthropic.Claude
+      required: true
+    - id: Anysphere.Cursor
+      name: Anysphere.Cursor
+      required: true
+    - id: Apple.Bonjour
+      name: Apple.Bonjour
+      required: true
+    - id: BenHollis.PNGGauntlet
+      name: BenHollis.PNGGauntlet
+      required: true
+    - id: BurntSushi.ripgrep.MSVC
+      name: BurntSushi.ripgrep.MSVC
+      required: true
+    - id: Canonical.Ubuntu
+      name: Canonical.Ubuntu
+      required: true
+    - id: Canva.Canva
+      name: Canva.Canva
+      required: true
+    - id: DistroAV.DistroAV
+      name: DistroAV.DistroAV
+      required: true
+    - id: Docker.DockerDesktop
+      name: Docker.DockerDesktop
+      required: true
+    - id: dotPDN.PaintDotNet
+      name: dotPDN.PaintDotNet
+      required: true
+    - id: ElementLabs.LMStudio
+      name: ElementLabs.LMStudio
+      required: true
+    - id: Elgato.CameraHub
+      name: Elgato.CameraHub
+      required: true
+    - id: Elgato.ControlCenter
+      name: Elgato.ControlCenter
+      required: true
+    - id: Elgato.StreamDeck
+      name: Elgato.StreamDeck
+      required: true
+    - id: Elgato.WaveLink
+      name: Elgato.WaveLink
+      required: true
+    - id: Foxit.FoxitReader
+      name: Foxit.FoxitReader
+      required: true
+    - id: Foxit.PhantomPDF.Subscription.MSI
+      name: Foxit.PhantomPDF.Subscription.MSI
+      required: true
+    - id: Git.Git
+      name: Git.Git
+      required: true
+    - id: GitHub.cli
+      name: GitHub.cli
+      required: true
+    - id: GitHub.CopilotApp
+      name: GitHub.CopilotApp
+      required: true
+    - id: GoLang.Go
+      name: GoLang.Go
+      required: true
+    - id: Grammarly.Grammarly
+      name: Grammarly.Grammarly
+      required: true
+    - id: Grammarly.Grammarly.Office
+      name: Grammarly.Grammarly.Office
+      required: true
+    - id: Gyan.FFmpeg
+      name: Gyan.FFmpeg
+      required: true
+    - id: HandBrake.HandBrake
+      name: HandBrake.HandBrake
+      required: true
+    - id: Hugo.Hugo.Extended
+      name: Hugo.Hugo.Extended
+      required: true
+    - id: ImageMagick.ImageMagick
+      name: ImageMagick.ImageMagick
+      required: true
+    - id: JAMSoftware.TreeSize.Free
+      name: JAMSoftware.TreeSize.Free
+      required: true
+    - id: JanDeDobbeleer.OhMyPosh
+      name: JanDeDobbeleer.OhMyPosh
+      required: true
+    - id: JohnMacFarlane.Pandoc
+      name: JohnMacFarlane.Pandoc
+      required: true
+    - id: jqlang.jq
+      name: jqlang.jq
+      required: true
+    - id: KirillOsenkov.MSBuildStructuredLogViewer
+      name: KirillOsenkov.MSBuildStructuredLogViewer
+      required: true
+    - id: Kitware.CMake
+      name: Kitware.CMake
+      required: true
+    - id: LLVM.LLVM
+      name: LLVM.LLVM
+      required: true
+    - id: Logitech.OptionsPlus
+      name: Logitech.OptionsPlus
+      required: true
+    - id: Microsoft.AppInstaller
+      name: Microsoft.AppInstaller
+      required: true
+    - id: Microsoft.Azure.AZCopy.10
+      name: Microsoft.Azure.AZCopy.10
+      required: true
+    - id: Microsoft.Azure.FunctionsCoreTools
+      name: Microsoft.Azure.FunctionsCoreTools
+      required: true
+    - id: Microsoft.AzureCLI
+      name: Microsoft.AzureCLI
+      required: true
+    - id: Microsoft.CLRTypesSQLServer.2019
+      name: Microsoft.CLRTypesSQLServer.2019
+      required: true
+    - id: Microsoft.DirectX
+      name: Microsoft.DirectX
+      required: true
+    - id: Microsoft.DotNet.DesktopRuntime.7
+      name: Microsoft.DotNet.DesktopRuntime.7
+      required: true
+    - id: Microsoft.DotNet.Framework.DeveloperPack.4.6
+      name: Microsoft.DotNet.Framework.DeveloperPack.4.6
+      required: true
+    - id: Microsoft.DotNet.Native.Runtime
+      name: Microsoft.DotNet.Native.Runtime
+      required: true
+    - id: Microsoft.DotNet.Runtime.10
+      name: Microsoft.DotNet.Runtime.10
+      required: true
+    - id: Microsoft.DotNet.SDK.10
+      name: Microsoft.DotNet.SDK.10
+      required: true
+    - id: Microsoft.Edge
+      name: Microsoft.Edge
+      required: true
+    - id: Microsoft.FoundryLocal
+      name: Microsoft.FoundryLocal
+      required: true
+    - id: Microsoft.GameInput
+      name: Microsoft.GameInput
+      required: true
+    - id: Microsoft.IntelligentTerminal
+      name: Microsoft.IntelligentTerminal
+      required: true
+    - id: Microsoft.msodbcsql.17
+      name: Microsoft.msodbcsql.17
+      required: true
+    - id: Microsoft.NuGet
+      name: Microsoft.NuGet
+      required: true
+    - id: Microsoft.OneDrive
+      name: Microsoft.OneDrive
+      required: true
+    - id: Microsoft.OpenCLGLVulkanCompatibilityPack
+      name: Microsoft.OpenCLGLVulkanCompatibilityPack
+      required: true
+    - id: Microsoft.PowerShell
+      name: Microsoft.PowerShell
+      required: true
+    - id: Microsoft.PowerToys
+      name: Microsoft.PowerToys
+      required: true
+    - id: Microsoft.RemoteDesktopClient
+      name: Microsoft.RemoteDesktopClient
+      required: true
+    - id: Microsoft.Sysinternals.Handle
+      name: Microsoft.Sysinternals.Handle
+      required: true
+    - id: Microsoft.Sysinternals.ProcessExplorer
+      name: Microsoft.Sysinternals.ProcessExplorer
+      required: true
+    - id: Microsoft.Sysinternals.PsTools
+      name: Microsoft.Sysinternals.PsTools
+      required: true
+    - id: Microsoft.Sysinternals.ZoomIt
+      name: Microsoft.Sysinternals.ZoomIt
+      required: true
+    - id: Microsoft.Teams
+      name: Microsoft.Teams
+      required: true
+    - id: Microsoft.UI.Xaml.2.8
+      name: Microsoft.UI.Xaml.2.8
+      required: true
+    - id: Microsoft.VCLibs.14
+      name: Microsoft.VCLibs.14
+      required: true
+    - id: Microsoft.VCLibs.Desktop.14
+      name: Microsoft.VCLibs.Desktop.14
+      required: true
+    - id: Microsoft.VCRedist.2015+.x86
+      name: Microsoft.VCRedist.2015+.x86
+      required: true
+    - id: Microsoft.VisualStudio.2022.BuildTools
+      name: Microsoft.VisualStudio.2022.BuildTools
+      required: true
+    - id: Microsoft.VisualStudio.Enterprise
+      name: Microsoft.VisualStudio.Enterprise
+      required: true
+    - id: Microsoft.VisualStudio.Enterprise.Insiders
+      name: Microsoft.VisualStudio.Enterprise.Insiders
+      required: true
+    - id: Microsoft.VisualStudio.Extensions.TypeScript
+      name: Microsoft.VisualStudio.Extensions.TypeScript
+      required: true
+    - id: Microsoft.VisualStudioCode
+      name: Microsoft.VisualStudioCode
+      required: true
+    - id: Microsoft.VisualStudioCode.Insiders
+      name: Microsoft.VisualStudioCode.Insiders
+      required: true
+    - id: Microsoft.VSTOR
+      name: Microsoft.VSTOR
+      required: true
+    - id: Microsoft.WebDeploy
+      name: Microsoft.WebDeploy
+      required: true
+    - id: Microsoft.WindowsApp
+      name: Microsoft.WindowsApp
+      required: true
+    - id: Microsoft.WindowsAppRuntime.1.8
+      name: Microsoft.WindowsAppRuntime.1.8
+      required: true
+    - id: Microsoft.WindowsSDK.10.0.26100
+      name: Microsoft.WindowsSDK.10.0.26100
+      required: true
+    - id: Microsoft.WindowsTerminal
+      name: Microsoft.WindowsTerminal
+      required: true
+    - id: Microsoft.WindowsTerminal.Preview
+      name: Microsoft.WindowsTerminal.Preview
+      required: true
+    - id: Microsoft.WingetCreate
+      name: Microsoft.WingetCreate
+      required: true
+    - id: Microsoft.WSL
+      name: Microsoft.WSL
+      required: true
+    - id: MiKTeX.MiKTeX
+      name: MiKTeX.MiKTeX
+      required: true
+    - id: NDI.NDIRuntime
+      name: NDI.NDIRuntime
+      required: true
+    - id: nkdAgility.AzureDevOpsMigrationTools
+      name: nkdAgility.AzureDevOpsMigrationTools
+      required: true
+    - id: NSSM.NSSM
+      name: NSSM.NSSM
+      required: true
+    - id: Obsidian.Obsidian
+      name: Obsidian.Obsidian
+      required: true
+    - id: OBSProject.OBSStudio
+      name: OBSProject.OBSStudio
+      required: true
+    - id: Ollama.Ollama
+      name: Ollama.Ollama
+      required: true
+    - id: OpenAI.Codex
+      name: OpenAI.Codex
+      required: true
+    - id: OpenJS.NodeJS
+      name: OpenJS.NodeJS
+      required: true
+    - id: Python.Launcher
+      name: Python.Launcher
+      required: true
+    - id: Python.Python.3.13
+      name: Python.Python.3.13
+      required: true
+    - id: RazerInc.RazerInstaller.Synapse4
+      name: RazerInc.RazerInstaller.Synapse4
+      required: true
+    - id: Romanitho.Winget-AutoUpdate
+      name: Romanitho.Winget-AutoUpdate
+      required: true
+    - id: RoyShilkrot.obs-backgroundremoval
+      name: RoyShilkrot.obs-backgroundremoval
+      required: true
+    - id: Rustlang.Rustup
+      name: Rustlang.Rustup
+      required: true
+    - id: ScooterSoftware.BeyondCompare.5
+      name: ScooterSoftware.BeyondCompare.5
+      required: true
+    - id: SlackTechnologies.Slack
+      name: SlackTechnologies.Slack
+      required: true
+    - id: Sonos.Controller
+      name: Sonos.Controller
+      required: true
+    - id: Spotify.Spotify
+      name: Spotify.Spotify
+      required: true
+    - id: StrawberryPerl.StrawberryPerl
+      name: StrawberryPerl.StrawberryPerl
+      required: true
+    - id: TeamViewer.TeamViewer
+      name: TeamViewer.TeamViewer
+      required: true
+    - id: TechSmith.Snagit.2025
+      name: TechSmith.Snagit.2025
+      required: true
+    - id: Telerik.Fiddler.Everywhere
+      name: Telerik.Fiddler.Everywhere
+      required: true
+    - id: TheDocumentFoundation.LibreOffice
+      name: TheDocumentFoundation.LibreOffice
+      required: true
+    - id: Ubiquiti.WiFimanDesktop
+      name: Ubiquiti.WiFimanDesktop
+      required: true
+    - id: Valve.Steam
+      name: Valve.Steam
+      required: true
+    - id: Warp.Warp
+      name: Warp.Warp
+      required: true
+    - id: WinSCP.WinSCP
+      name: WinSCP.WinSCP
+      required: true
+    - id: WiresharkFoundation.Wireshark
+      name: WiresharkFoundation.Wireshark
+      required: true
+    - id: Zoom.Zoom.EXE
+      name: Zoom.Zoom.EXE
+      required: true
 name: windows-common
 platform: win
 
-winget:
-  packages:
-    winget:
-      - id: Git.Git
-        name: Git
-        description: Git version control system.
-        required: true
-
-      - id: Microsoft.PowerShell
-        name: PowerShell
-        description: PowerShell 7 shell and scripting runtime.
-        required: true
-
-      - id: Microsoft.VisualStudioCode
-        name: Visual Studio Code
-        description: Code editor.
-        required: true
-
-      - id: GitHub.cli
-        name: GitHub CLI
-        description: GitHub command-line interface.
-        required: true
-
-      - id: Microsoft.AzureCLI
-        name: Azure CLI
-        description: Command-line tools for Microsoft Azure.
-        required: true
-
-      - id: Microsoft.WindowsTerminal
-        name: Windows Terminal
-        description: Modern terminal application for Windows.
-        required: true
-
-      - id: JanDeDobbeleer.OhMyPosh
-        name: Oh My Posh
-        description: Prompt theme engine.
-        required: true
-
-      - id: Microsoft.PowerToys
-        name: PowerToys
-        description: Microsoft PowerToys utilities.
-        required: true
-
-    msstore: []

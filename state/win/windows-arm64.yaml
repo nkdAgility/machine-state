@@ -5,19 +5,14 @@ architecture: arm64
 winget:
   packages:
     winget:
-      - id: Microsoft.DotNet.SDK.10
-        name: .NET SDK 10
-        description: .NET 10 SDK.
+      - id: Microsoft.DotNet.DesktopRuntime.8.arm64
+        name: Microsoft.DotNet.DesktopRuntime.8.arm64
         required: true
 
-      - id: Microsoft.DotNet.SDK.9
-        name: .NET SDK 9
-        description: .NET 9 SDK.
+      - id: Microsoft.VCRedist.2015+.arm64
+        name: Microsoft.VCRedist.2015+.arm64
         required: true
 
-      - id: Microsoft.DotNet.SDK.8
-        name: .NET SDK 8
-        description: .NET 8 SDK.
-        required: true
+    msstore:
+      []
 
-    msstore: []
