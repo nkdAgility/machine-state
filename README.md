@@ -26,7 +26,15 @@ The goal is to rebuild, update, export, and synchronize workstation state in a d
 
 ## How to Run
 
-Run from repository root with PowerShell 7+:
+On a fresh machine or from cmd.exe, use the bootstrap wrapper:
+
+```cmd
+machine-state.cmd sync
+```
+
+This installs PowerShell 7+ and the YAML module if missing, then runs the script.
+
+If PowerShell 7+ is already installed, run directly:
 
 ```powershell
 ./machine-state.ps1 capture   # Record current machine state
