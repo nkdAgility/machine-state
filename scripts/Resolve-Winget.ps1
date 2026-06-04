@@ -151,6 +151,7 @@ switch ($Stage) {
         if ($PSCmdlet.ShouldProcess($Context.WingetExportPath, "Export Winget state")) {
             $unavailablePath = Join-Path $Context.ExportPath "winget.unavailable.json"
             $licensePath = Join-Path $Context.ExportPath "winget.license-required.json"
+            $upgradesPath = Join-Path $Context.ExportPath "winget.upgrades.json"
 
             # Run winget export and capture stderr for unavailable/license warnings
             $stderrFile = [System.IO.Path]::GetTempFileName()
@@ -210,6 +211,49 @@ switch ($Stage) {
                 if (Test-Path -LiteralPath $stderrFile) {
                     Remove-Item -LiteralPath $stderrFile -Force -ErrorAction SilentlyContinue
                 }
+            }
+
+            # Detect packages with available upgrades
+            Write-Host "Checking for available upgrades..."
+            $upgradeOutput = & winget upgrade --include-unknown 2>$null
+            $upgrades = @()
+
+            # Parse winget upgrade output (table format)
+            # Skip header lines and parse package lines
+            $inTable = $false
+            foreach ($line in $upgradeOutput) {
+                # Detect table header separator line (dashes)
+                if ($line -match "^-+$" -or $line -match "^[-\s]+$") {
+                    $inTable = $true
+                    continue
+                }
+
+                # Skip summary lines at the end
+                if ($line -match "^\d+ upgrades available" -or [string]::IsNullOrWhiteSpace($line)) {
+                    continue
+                }
+
+                if ($inTable -and $line.Length -gt 20) {
+                    # Parse fixed-width columns: Name, Id, Version, Available, Source
+                    # Try to extract the package ID (second column, usually starts after name)
+                    if ($line -match "^(.+?)\s{2,}(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$") {
+                        $upgrades += [ordered]@{
+                            name      = $Matches[1].Trim()
+                            id        = $Matches[2].Trim()
+                            installed = $Matches[3].Trim()
+                            available = $Matches[4].Trim()
+                            source    = $Matches[5].Trim()
+                        }
+                    }
+                }
+            }
+
+            if ($upgrades.Count -gt 0) {
+                $upgrades | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
+                Write-Host "$($upgrades.Count) package(s) have upgrades available (logged to winget.upgrades.json)"
+            }
+            elseif (Test-Path -LiteralPath $upgradesPath) {
+                Remove-Item -LiteralPath $upgradesPath -Force
             }
         }
     }
@@ -272,8 +316,19 @@ switch ($Stage) {
             $missingWinget = @($desiredWinget | Where-Object { $installedWinget -notcontains $_ } | Sort-Object)
             $missingMsstore = @($desiredMsstore | Where-Object { $installedMsstore -notcontains $_ } | Sort-Object)
 
-            if ($missingWinget.Count -eq 0 -and $missingMsstore.Count -eq 0) {
-                Write-Host "All winget packages are already installed"
+            # Check for upgrades (from capture export)
+            $upgradesPath = Join-Path $Context.ExportPath "winget.upgrades.json"
+            $upgradeableWinget = @()
+            if (Test-Path -LiteralPath $upgradesPath) {
+                $allUpgrades = Get-Content -LiteralPath $upgradesPath -Raw | ConvertFrom-Json
+                # Filter to only packages in desired state
+                $upgradeableWinget = @($allUpgrades | Where-Object { $desiredWinget -contains $_.id -or $desiredMsstore -contains $_.id })
+            }
+
+            $hasWork = $missingWinget.Count -gt 0 -or $missingMsstore.Count -gt 0 -or $upgradeableWinget.Count -gt 0
+
+            if (-not $hasWork) {
+                Write-Host "All winget packages are installed and up to date"
             }
             else {
                 if ($missingWinget.Count -gt 0) {
@@ -283,6 +338,12 @@ switch ($Stage) {
                 if ($missingMsstore.Count -gt 0) {
                     Write-Host "Would install $($missingMsstore.Count) msstore package(s):"
                     foreach ($pkg in $missingMsstore) { Write-Host "  - $pkg" }
+                }
+                if ($upgradeableWinget.Count -gt 0) {
+                    Write-Host "Would upgrade $($upgradeableWinget.Count) package(s):"
+                    foreach ($pkg in $upgradeableWinget | Sort-Object { $_.id }) {
+                        Write-Host "  - $($pkg.id): $($pkg.installed) -> $($pkg.available)"
+                    }
                 }
             }
             return

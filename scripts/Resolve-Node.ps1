@@ -88,6 +88,36 @@ switch ($Stage) {
         if ($PSCmdlet.ShouldProcess($Context.NodeExportPath, "Export npm global packages")) {
             $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $Context.NodeExportPath -Encoding UTF8
         }
+
+        # Detect outdated npm packages
+        Write-Host "Checking for npm updates..."
+        $upgradesPath = Join-Path $Context.ExportPath "node.upgrades.json"
+        $outdatedRaw = & npm outdated -g --json 2>$null
+        $upgrades = @()
+
+        if ($outdatedRaw) {
+            try {
+                $outdatedParsed = $outdatedRaw | ConvertFrom-Json
+                foreach ($prop in $outdatedParsed.PSObject.Properties) {
+                    $upgrades += [ordered]@{
+                        id        = [string]$prop.Name
+                        installed = [string]$prop.Value.current
+                        available = [string]$prop.Value.latest
+                    }
+                }
+            }
+            catch {
+                # npm outdated returns non-JSON when no outdated packages
+            }
+        }
+
+        if ($upgrades.Count -gt 0) {
+            $upgrades | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
+            Write-Host "$($upgrades.Count) npm package(s) have upgrades available"
+        }
+        elseif (Test-Path -LiteralPath $upgradesPath) {
+            Remove-Item -LiteralPath $upgradesPath -Force
+        }
     }
 
     "Build" {
@@ -144,12 +174,30 @@ switch ($Stage) {
 
             $missingPkgs = @($desiredPkgs | Where-Object { $installedPkgs -notcontains $_ } | Sort-Object)
 
-            if ($missingPkgs.Count -eq 0) {
-                Write-Host "All npm packages are already installed"
+            # Check for upgrades
+            $upgradesPath = Join-Path $Context.ExportPath "node.upgrades.json"
+            $upgradeablePkgs = @()
+            if (Test-Path -LiteralPath $upgradesPath) {
+                $allUpgrades = Get-Content -LiteralPath $upgradesPath -Raw | ConvertFrom-Json
+                $upgradeablePkgs = @($allUpgrades | Where-Object { $desiredPkgs -contains $_.id })
+            }
+
+            $hasWork = $missingPkgs.Count -gt 0 -or $upgradeablePkgs.Count -gt 0
+
+            if (-not $hasWork) {
+                Write-Host "All npm packages are installed and up to date"
             }
             else {
-                Write-Host "Would install $($missingPkgs.Count) npm package(s):"
-                foreach ($pkg in $missingPkgs) { Write-Host "  - $pkg" }
+                if ($missingPkgs.Count -gt 0) {
+                    Write-Host "Would install $($missingPkgs.Count) npm package(s):"
+                    foreach ($pkg in $missingPkgs) { Write-Host "  - $pkg" }
+                }
+                if ($upgradeablePkgs.Count -gt 0) {
+                    Write-Host "Would upgrade $($upgradeablePkgs.Count) npm package(s):"
+                    foreach ($pkg in $upgradeablePkgs | Sort-Object { $_.id }) {
+                        Write-Host "  - $($pkg.id): $($pkg.installed) -> $($pkg.available)"
+                    }
+                }
             }
             return
         }
