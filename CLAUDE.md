@@ -59,19 +59,47 @@ deduplicated by the engine — the app resolver owns it entirely.
 Structure:
 
 ```
-scripts/apps/<Publisher.AppName>/Resolve.ps1   ← resolver (Export / Build / Execute)
+scripts/apps/<Publisher.AppName>/apply.ps1     ← called during Execute stage (configure or install)
+scripts/apps/<Publisher.AppName>/capture.ps1   ← called during Capture stage (export state back to repo)
+scripts/apps/<Publisher.AppName>/build.ps1     ← called during Build stage (optional, prepare artifacts)
 state/config/<Publisher.AppName>/              ← config files committed to the repo
 ```
 
+Only create the scripts you need — none are mandatory. The engine discovers them
+automatically by scanning `scripts/apps/` for the relevant filename.
+
+Each script accepts only `-Context` (no `-Stage`) and uses
+`[CmdletBinding(SupportsShouldProcess)]`. They call `Invoke-SetupStage` with the
+stage hardcoded to the script's role (`Execute` in `apply.ps1`, etc.).
+
 Examples:
 
-| App | Resolver | Config |
-|-----|----------|--------|
-| Oh My Posh | `scripts/apps/JanDeDobbeleer.OhMyPosh/Resolve.ps1` | `state/config/JanDeDobbeleer.OhMyPosh/ohmyposh.nkdagility.json` |
-| Stream Deck | `scripts/apps/Elgato.StreamDeck/Resolve.ps1` | `state/config/Elgato.StreamDeck/stream-deck-profiles.streamDeckProfilesBackup` |
+| App | Scripts | Config |
+|-----|---------|--------|
+| Oh My Posh | `apply.ps1` | `state/config/JanDeDobbeleer.OhMyPosh/ohmyposh.nkdagility.json` |
+| Stream Deck | `apply.ps1`, `capture.ps1` | `state/config/Elgato.StreamDeck/stream-deck-profiles.streamDeckProfilesBackup` |
 
-App resolvers use `Setup-Engine.ps1` (`Invoke-SetupStage`) with a catalog of
-Check / Apply pairs. They do not add entries to the primary YAML state.
+### Ad-hoc installers — apps not available in winget
+
+If an app has no winget package, create an `apply.ps1` that:
+
+1. Checks the Windows uninstall registry to see if the app is already installed.
+2. Downloads the installer to `$env:TEMP` and runs it silently if not found.
+3. Cleans up the downloaded file afterwards.
+
+Use `Invoke-SetupStage -Stage Execute` with a Check / Apply catalog entry, setting
+`RequiresAdmin` appropriately. Architecture-specific URLs should be selected from
+`$Context.Architecture`.
+
+Examples: `scripts/apps/Nvidia.ArSDK/apply.ps1`, `scripts/apps/GitHub.GitHubCopilot/apply.ps1`
+
+### Winget post-install hooks — `Resolve.ps1`
+
+`Resolve.ps1` under `scripts/apps/<PackageId>/` is a **winget post-install hook**.
+It is called by `systems/Winget/Resolve.ps1` immediately after that specific winget
+package is installed, and accepts `-Stage` and `-Context`. Use it only when a winget
+package needs extra configuration applied right after installation (e.g. `Git.Git`).
+Do not use `Resolve.ps1` as a general app lifecycle script — use `apply.ps1` instead.
 
 ---
 
@@ -87,28 +115,35 @@ winget package an app resolver belongs to.
 
 ```
 state/
-  common.yaml       ← cross-platform, every machine (dotnet tools, PS modules, git repos, setup.git)
-  machines/         ← one file per named workstation
-  win/              ← Windows platform state (winget packages, npm, uv, setup.windows)
-  config/           ← app config files, one folder per Publisher.AppName
+  common.yaml           ← cross-platform, every machine (dotnet tools, PS modules, git repos, setup.git)
+  machines/             ← one file per named workstation
+  win/                  ← Windows platform state (winget packages, npm, uv, setup.windows)
+  config/               ← app config files, one folder per Publisher.AppName
 
 scripts/
   State-Engine.ps1
   Setup-Engine.ps1
   Resolver-Common.ps1
   systems/
-    WindowsSetup/Resolve.ps1   ← Windows OS configuration
-    Winget/Resolve.ps1         ← winget packages
-    DotNet/Resolve.ps1         ← dotnet global tools
-    PSModule/Resolve.ps1       ← PowerShell modules
-    Node/Resolve.ps1           ← npm global packages
-    Uv/Resolve.ps1             ← uv tools
-    GitRepos/Resolve.ps1       ← git repo clone/pull
+    WindowsSetup/Resolve.ps1    ← Windows OS configuration
+    Winget/Resolve.ps1          ← winget packages
+    DotNet/Resolve.ps1          ← dotnet global tools
+    PSModule/Resolve.ps1        ← PowerShell modules
+    Node/Resolve.ps1            ← npm global packages
+    Uv/Resolve.ps1              ← uv tools
+    GitRepos/Resolve.ps1        ← git repo clone/pull
     GitReposCleanup/Resolve.ps1 ← git branch cleanup
   apps/
-    Git.Git/Resolve.ps1
-    JanDeDobbeleer.OhMyPosh/Resolve.ps1
-    Elgato.StreamDeck/Resolve.ps1
+    Git.Git/apply.ps1                          ← git global config (setup.git catalog)
+    JanDeDobbeleer.OhMyPosh/apply.ps1          ← apply.ps1 = Execute stage
+    JanDeDobbeleer.OhMyPosh/capture.ps1        ← capture.ps1 = Capture stage
+    Elgato.StreamDeck/apply.ps1
+    Elgato.StreamDeck/capture.ps1
+    Microsoft.VisualStudioCode/apply.ps1
+    OBSProject.OBSStudio/apply.ps1
+    OBSProject.OBSStudio/capture.ps1
+    Nvidia.ArSDK/apply.ps1                     ← ad-hoc installer (not in winget)
+    GitHub.GitHubCopilot/apply.ps1             ← ad-hoc installer (not in winget)
 
 working/          ← generated outputs, gitignored except .gitkeep
 ```
@@ -137,13 +172,16 @@ working/          ← generated outputs, gitignored except .gitkeep
 6. **App resolver naming.** Always use the winget `Publisher.AppName` format for the
    folder name under `scripts/apps/` and `state/config/`.
 
-7. **Resolver contract.** Every `Resolve.ps1` under `scripts/apps/` must accept
-   `-Stage` (`Export` / `Build` / `Execute`) and `-Context`, and must use
-   `[CmdletBinding(SupportsShouldProcess)]`.
+7. **App script contract.** Scripts under `scripts/apps/<Publisher.AppName>/` accept
+   only `-Context` and use `[CmdletBinding(SupportsShouldProcess)]`. The stage is
+   implicit in the filename (`apply.ps1` = Execute, `capture.ps1` = Capture,
+   `build.ps1` = Build). The exception is `Resolve.ps1`, which is a winget
+   post-install hook and must accept both `-Stage` and `-Context`.
 
-8. **Export updates state.** Where an app stores config files (e.g. Stream Deck
-   profiles), the Export stage should write back to `state/config/<Publisher.AppName>/`
-   so the repo stays current and changes can be committed.
+8. **Capture updates state.** Where an app stores config files (e.g. Stream Deck
+   profiles, OBS scenes), the `capture.ps1` script should write them back to
+   `state/config/<Publisher.AppName>/` so the repo stays current and changes can
+   be committed.
 
 9. **No Bash.** PowerShell 7+ only.
 

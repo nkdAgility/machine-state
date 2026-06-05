@@ -77,19 +77,26 @@ machine-state/
     State-Engine.ps1
     Setup-Engine.ps1
     Resolver-Common.ps1
-    Resolve-WindowsSetup.ps1
-    Resolve-GitSetup.ps1
-    Resolve-Winget.ps1
-    Resolve-DotNet.ps1
-    Resolve-PSModule.ps1
-    Resolve-Node.ps1
-    Resolve-Uv.ps1
-    Resolve-GitRepos.ps1
-    Resolve-GitReposCleanup.ps1
+    systems/
+      WindowsSetup/Resolve.ps1
+      Winget/Resolve.ps1
+      DotNet/Resolve.ps1
+      PSModule/Resolve.ps1
+      Node/Resolve.ps1
+      Uv/Resolve.ps1
+      GitRepos/Resolve.ps1
+      GitReposCleanup/Resolve.ps1
     apps/
-      Git.Git/
-      JanDeDobbeleer.OhMyPosh/
-      Elgato.StreamDeck/
+      Git.Git/apply.ps1
+      JanDeDobbeleer.OhMyPosh/apply.ps1
+      JanDeDobbeleer.OhMyPosh/capture.ps1
+      Elgato.StreamDeck/apply.ps1
+      Elgato.StreamDeck/capture.ps1
+      Microsoft.VisualStudioCode/apply.ps1
+      OBSProject.OBSStudio/apply.ps1
+      OBSProject.OBSStudio/capture.ps1
+      Nvidia.ArSDK/apply.ps1
+      GitHub.GitHubCopilot/apply.ps1
 
   working/
     <MachineName>/
@@ -190,13 +197,16 @@ Example:
     MachineStatePath = "<repo-root>/state/machines/NKDA-BEHEMOTH.yaml"
     WorkingPath      = "<repo-root>/working/NKDA-BEHEMOTH"
     ExportPath       = "<repo-root>/working/NKDA-BEHEMOTH/export"
-    MergePath        = "<repo-root>/working/NKDA-BEHEMOTH/merge"
+    MergePath        = "<repo-root>/working/NKDA-BEHEMOTH"    # same as WorkingPath
     BuildPath        = "<repo-root>/working/NKDA-BEHEMOTH/build"
     LogsPath         = "<repo-root>/working/NKDA-BEHEMOTH/logs"
-    MergedStateYaml  = "<repo-root>/working/NKDA-BEHEMOTH/merge/machine-state.merged.yaml"
-    MergedStateJson  = "<repo-root>/working/NKDA-BEHEMOTH/merge/machine-state.merged.json"
+    MergedStateYaml  = "<repo-root>/working/NKDA-BEHEMOTH/machine-state.yaml"
+    MergedStateJson  = "<repo-root>/working/NKDA-BEHEMOTH/machine-state.json"
 }
 ```
+
+`MergePath` equals `WorkingPath`. Merged state files are written directly into
+`working/<MachineName>/`, not into a `merge/` subfolder.
 
 There are no resolver-specific path properties on the context. Each resolver derives its own file paths from `ExportPath`, `BuildPath`, and `LogsPath`.
 
@@ -219,15 +229,17 @@ git:
 state:
   - ../win/windows-common.yaml
   - ../win/windows-x64.yaml
-  - ../apps/git-common.yaml
+  - ../common.yaml
 
 scripts:
-  - Resolve-WindowsSetup.ps1
-  - Resolve-Winget.ps1
-  - Resolve-Node.ps1
-  - Resolve-Uv.ps1
-  - Resolve-Git.ps1
-  - Resolve-GitCleanup.ps1
+  - systems\WindowsSetup\Resolve.ps1
+  - systems\Winget\Resolve.ps1
+  - systems\DotNet\Resolve.ps1
+  - systems\PSModule\Resolve.ps1
+  - systems\Node\Resolve.ps1
+  - systems\Uv\Resolve.ps1
+  - systems\GitRepos\Resolve.ps1
+  - systems\GitReposCleanup\Resolve.ps1
 
 exclusions:
   packages:
@@ -263,7 +275,7 @@ Key fields:
 
 ### Shared State YAML
 
-Shared files (e.g. `state/win/windows-common.yaml`, `state/apps/git-common.yaml`) may contain any combination of:
+Shared files (e.g. `state/win/windows-common.yaml`, `state/common.yaml`) may contain any combination of:
 
 ```yaml
 winget:
@@ -334,7 +346,10 @@ Git repo fields:
 
 ## Resolver Contract
 
-All resolver scripts follow this contract:
+### System resolvers (`scripts/systems/<Name>/Resolve.ps1`)
+
+System resolvers are invoked by `machine-state.ps1` via `Invoke-ResolverScript`.
+They handle a full lifecycle — Export, Build, Execute:
 
 ```powershell
 #Requires -Version 7.0
@@ -353,13 +368,42 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 ```
 
-Resolver scripts are invoked by `Invoke-ResolverScript` in `State-Engine.ps1`. Each invocation prints a stage/script banner:
+Each invocation prints a stage/script banner:
 
 ```text
---- Build : Resolve-Winget.ps1 ---
+--- Build : systems\Winget\Resolve.ps1 ---
 ```
 
-Each resolver dot-sources either `Resolver-Common.ps1` (for package resolvers) or `Setup-Engine.ps1` (for setup resolvers), then implements a `switch ($Stage)` block for Export, Build, and Execute.
+Each system resolver dot-sources either `Resolver-Common.ps1` (package resolvers)
+or `Setup-Engine.ps1` (setup resolvers), then implements a `switch ($Stage)` block.
+
+### App scripts (`scripts/apps/<Publisher.AppName>/`)
+
+App scripts are invoked automatically for all apps during each stage. They accept
+only `-Context` (no `-Stage`) and hardcode the stage in their logic:
+
+| Filename | Stage | Called by |
+|----------|-------|-----------|
+| `apply.ps1` | Execute | `Invoke-StageExecute` |
+| `capture.ps1` | Capture | `Invoke-StageCapture` |
+| `build.ps1` | Build | `Invoke-StageBuild` |
+
+```powershell
+#Requires -Version 7.0
+
+[CmdletBinding(SupportsShouldProcess)]
+param(
+    [Parameter(Mandatory)]
+    [pscustomobject]$Context
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+```
+
+App scripts that configure an installed app use `Invoke-SetupStage` from
+`Setup-Engine.ps1` with a Check / Apply catalog. Ad-hoc installers (apps not in
+winget) use `apply.ps1` to check the Windows registry and download/install if missing.
 
 The three-stage pattern:
 
@@ -373,7 +417,7 @@ The three-stage pattern:
 
 ## Resolver-Common.ps1
 
-Dot-sourced by all package resolver scripts (`Resolve-Winget.ps1`, `Resolve-Node.ps1`, `Resolve-Uv.ps1`, `Resolve-Git.ps1`).
+Dot-sourced by all system resolver scripts (`systems/Winget/Resolve.ps1`, `systems/Node/Resolve.ps1`, `systems/Uv/Resolve.ps1`, `systems/GitRepos/Resolve.ps1`).
 
 ### Functions
 
@@ -621,9 +665,25 @@ Catalog IDs:
 | `office-insider-beta` | Office Insider Beta channel (machine policy) | Yes |
 | `office-insider-behavior` | Office Insider slab behavior (user policy) | No |
 
-### Resolve-GitSetup (not yet implemented)
+### Git.Git/apply.ps1
 
-A planned resolver for topic `git`. The catalog IDs referenced in shared state YAML (`long-paths`, `default-branch`, `autocrlf`, `pull-rebase`, `editor-vscode`, `diff-tool-vscode`, `merge-tool-vscode`) are prepared for this resolver. The script file does not yet exist.
+Topic: `git`. This is an **app script** (not a system resolver) that applies global
+git configuration settings. It dot-sources `Setup-Engine.ps1` and calls
+`Invoke-SetupStage -Stage Execute`.
+
+Catalog IDs:
+
+| ID | Name | Admin Required |
+|---|---|---|
+| `default-branch` | Git default branch name (main) | No |
+| `autocrlf` | Git line endings (autocrlf = true) | No |
+| `long-paths` | Git long path support | No |
+| `push-default` | Git push default (current) | No |
+| `pull-rebase` | Git pull rebase (false — merge, not rebase) | No |
+| `fetch-prune` | Git auto-prune remote tracking branches | No |
+| `editor-vscode` | Git editor (VS Code) | No |
+| `diff-tool-vscode` | Git diff tool (VS Code) | No |
+| `merge-tool-vscode` | Git merge tool (VS Code) | No |
 
 ---
 
@@ -666,19 +726,17 @@ All generated files live under `working/<MachineName>/`. Folders are created on 
 
 ```text
 working/<MachineName>/
+  machine-state.yaml            # merged desired state (YAML)
+  machine-state.json            # merged desired state (JSON)
+
   export/
     winget.export.json          # raw winget export
     winget.unavailable.json     # sideloaded/unavailable packages (if any)
-    winget.license-required.json # license-required packages (if any)
     node.npm.export.json        # npm global packages
     uv.tools.export.json        # uv tools
     git.export.json             # discovered git repos
     windows.setup.json          # windows setup check results
     <topic>.setup.json          # setup check results per topic
-
-  merge/
-    machine-state.merged.yaml
-    machine-state.merged.json
 
   build/
     winget.import.json          # automated winget install manifest
@@ -688,6 +746,7 @@ working/<MachineName>/
     node.upgrades.json          # detected npm upgrades (if any)
     uv.tools.import.json        # uv install manifest
     git.ops.json                # git clone/pull plan
+    manual-actions.json         # accumulated manual action reminders
 
   logs/
     winget.export.log           # stdout+stderr from winget export
@@ -783,7 +842,7 @@ The implementation is complete when:
 
 1. `./machine-state.ps1 status -MachineName NKDA-BEHEMOTH` shows machine name, YAML path, platform, architecture, referenced state files, scripts, and working path.
 2. `./machine-state.ps1 validate` passes for all configured machines without installing anything.
-3. `./machine-state.ps1 merge -MachineName NKDA-BEHEMOTH` writes `working/NKDA-BEHEMOTH/merge/machine-state.merged.yaml` and `.json`.
+3. `./machine-state.ps1 merge -MachineName NKDA-BEHEMOTH` writes `working/NKDA-BEHEMOTH/machine-state.yaml` and `machine-state.json`.
 4. The merged output combines packages from all referenced state files and the machine file; exclusions are applied; results are deduplicated and sorted.
 5. `./machine-state.ps1 build -MachineName NKDA-BEHEMOTH` writes `working/NKDA-BEHEMOTH/build/winget.import.json` separating `winget` and `msstore` sources with only `PackageIdentifier` entries.
 6. Packages marked `manual: true` do not appear in `winget.import.json` and are printed as reminders during Execute.
@@ -791,7 +850,7 @@ The implementation is complete when:
 8. `./machine-state.ps1 export -MachineName NKDA-BEHEMOTH` writes observed state to `working/NKDA-BEHEMOTH/export/` for each configured resolver.
 9. `./machine-state.ps1 sync -MachineName NKDA-BEHEMOTH` runs all four stages in order.
 10. `./machine-state.ps1 sync -MachineName NKDA-BEHEMOTH -WhatIf` runs merge, then reports what would change without modifying the machine.
-11. `./machine-state.ps1 sync -Script Resolve-Git.ps1` runs only the git resolver.
+11. `./machine-state.ps1 sync -Script systems\GitRepos\Resolve.ps1` runs only the git repos resolver.
 12. `./machine-state.ps1 capture -MachineName NKDA-BEHEMOTH` exports observed state and ingests newly discovered packages into the first shared YAML file.
 13. `./machine-state.ps1 apply -MachineName NKDA-BEHEMOTH -BuildOnly` runs merge and build without executing.
 14. Unknown machines do not silently apply another machine's configuration.

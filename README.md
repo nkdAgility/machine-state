@@ -52,39 +52,51 @@ Primary state is everything the machine needs *installed*. It lives in YAML unde
 
 | Concern | Where it lives |
 |---------|----------------|
-| Winget packages | `state/machines/<Name>.yaml`, `state/win/*.yaml` |
-| Node / npm globals | `state/win/*.yaml`, `state/apps/*.yaml` |
-| Python / uv tools | `state/win/*.yaml`, `state/apps/*.yaml` |
-| .NET tools / SDKs | `state/win/*.yaml`, `state/apps/*.yaml` |
-| PowerShell modules | `state/win/*.yaml`, `state/apps/*.yaml` |
-| Git repositories | `state/apps/git-common.yaml` |
+| Winget packages | `state/win/*.yaml`, `state/machines/<Name>.yaml` |
+| Node / npm globals | `state/win/windows-common.yaml` |
+| Python / uv tools | `state/win/windows-common.yaml` |
+| .NET global tools | `state/common.yaml` |
+| PowerShell modules | `state/common.yaml` |
+| Git repositories | `state/common.yaml` |
+| Windows OS setup | `state/win/windows-common.yaml` (`setup.windows`) |
+| Git global config | `state/common.yaml` (`setup.git`) |
 
-The engine merges these, deduplicates by id, sorts deterministically, and writes
-a combined manifest to `working/<MachineName>/merge/` before executing.
+The engine merges these, deduplicates by `id`, sorts deterministically, and writes
+a combined manifest to `working/<MachineName>/` before executing.
 
 ### App Configuration
 
 App configuration is everything needed to *configure* an already-installed application —
 dotfiles, registry settings, profile entries, backup/restore of app data.
 
-Each app has its own resolver under `scripts/apps/<Publisher.AppName>/Resolve.ps1`.
-Config files committed to the repo live under `state/config/<Publisher.AppName>/`.
+Each app has scripts under `scripts/apps/<Publisher.AppName>/`:
 
-| App | Resolver | Config |
-|-----|----------|--------|
-| Oh My Posh | `scripts/apps/JanDeDobbeleer.OhMyPosh/Resolve.ps1` | `state/config/JanDeDobbeleer.OhMyPosh/` |
-| Stream Deck | `scripts/apps/Elgato.StreamDeck/Resolve.ps1` | `state/config/Elgato.StreamDeck/` |
-| Git config | `scripts/apps/Git.Git/Resolve.ps1` | *(global git config values, no files)* |
+| Script | Stage | Purpose |
+|--------|-------|---------|
+| `apply.ps1` | Execute | Configure or install the app |
+| `capture.ps1` | Capture | Export app state back to `state/config/` |
+| `build.ps1` | Build | Prepare artifacts (rarely needed) |
 
-App resolvers run as part of the normal stage pipeline but are self-contained —
-they do not feed back into primary YAML state.
+Only create the scripts you need — none are required. For apps not available in
+winget, `apply.ps1` checks the Windows registry and downloads/installs the app
+directly if missing.
+
+| App | Scripts | Config |
+|-----|---------|--------|
+| Git | `apply.ps1` | *(global git config — no files)* |
+| Oh My Posh | `apply.ps1`, `capture.ps1` | `state/config/JanDeDobbeleer.OhMyPosh/` |
+| Stream Deck | `apply.ps1`, `capture.ps1` | `state/config/Elgato.StreamDeck/` |
+| VS Code | `apply.ps1` | *(settings synced via VS Code)* |
+| OBS Studio | `apply.ps1`, `capture.ps1` | `state/config/OBSProject.OBSStudio/` |
+| NVIDIA AR SDK | `apply.ps1` | *(ad-hoc installer — not in winget)* |
+| GitHub Copilot | `apply.ps1` | *(ad-hoc installer — not in winget)* |
 
 ## Stages
 
 | Stage | What it does |
 |-------|-------------|
 | `export` | Read current machine state into `working/<MachineName>/export/` |
-| `merge` | Combine all referenced YAML into `working/<MachineName>/merge/` |
+| `merge` | Combine all referenced YAML into `working/<MachineName>/machine-state.yaml` |
 | `build` | Generate tool-specific manifests in `working/<MachineName>/build/` |
 | `execute` | Apply desired state — install packages, configure apps |
 | `sync` | Run all four stages in order |
@@ -96,25 +108,37 @@ they do not feed back into primary YAML state.
 
 ```
 state/
-  machines/       ← one file per named workstation
-  win/            ← shared Windows platform state
-  apps/           ← shared app-level primary state (git repos, npm globals, etc.)
-  config/         ← app config files committed to the repo
+  common.yaml         ← cross-platform, every machine (dotnet tools, PS modules, git repos, setup.git)
+  machines/           ← one file per named workstation
+  win/                ← Windows platform state (winget packages, npm, uv, setup.windows)
+  config/             ← app config files committed to the repo, one folder per Publisher.AppName
 
 scripts/
-  Resolve-Winget.ps1      ← primary concern resolvers
-  Resolve-Node.ps1
-  Resolve-Uv.ps1
-  Resolve-DotNet.ps1
-  Resolve-PSModule.ps1
-  Resolve-Git.ps1
-  Resolve-GitCleanup.ps1
+  State-Engine.ps1
+  Setup-Engine.ps1
+  Resolver-Common.ps1
+  systems/
+    WindowsSetup/Resolve.ps1    ← Windows OS configuration
+    Winget/Resolve.ps1          ← winget + msstore packages
+    DotNet/Resolve.ps1          ← dotnet global tools
+    PSModule/Resolve.ps1        ← PowerShell modules
+    Node/Resolve.ps1            ← npm global packages
+    Uv/Resolve.ps1              ← uv tools
+    GitRepos/Resolve.ps1        ← git repo clone/pull
+    GitReposCleanup/Resolve.ps1 ← git branch cleanup
   apps/
-    Git.Git/                        ← app configuration resolvers
-    JanDeDobbeleer.OhMyPosh/
-    Elgato.StreamDeck/
+    Git.Git/apply.ps1
+    JanDeDobbeleer.OhMyPosh/apply.ps1
+    JanDeDobbeleer.OhMyPosh/capture.ps1
+    Elgato.StreamDeck/apply.ps1
+    Elgato.StreamDeck/capture.ps1
+    Microsoft.VisualStudioCode/apply.ps1
+    OBSProject.OBSStudio/apply.ps1
+    OBSProject.OBSStudio/capture.ps1
+    Nvidia.ArSDK/apply.ps1
+    GitHub.GitHubCopilot/apply.ps1
 
-working/          ← generated outputs (gitignored)
+working/              ← generated outputs (gitignored)
 ```
 
 ## Working Folder
@@ -122,10 +146,24 @@ working/          ← generated outputs (gitignored)
 All generated files go under `working/<MachineName>/`:
 
 ```
-export/   ← observed current state
-merge/    ← combined desired state
-build/    ← tool-specific install manifests
-logs/     ← execution logs
+export/                     ← observed current state
+  winget.export.json
+  node.npm.export.json
+  uv.tools.export.json
+  git.export.json
+  windows.setup.json
+
+machine-state.yaml          ← merged desired state (YAML)
+machine-state.json          ← merged desired state (JSON)
+
+build/                      ← tool-specific install manifests
+  winget.import.json
+  winget.upgrades.json
+  node.npm.import.json
+  uv.tools.import.json
+  git.ops.json
+
+logs/                       ← execution logs
 ```
 
 These are outputs. `state/` is the source of truth.
