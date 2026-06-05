@@ -319,6 +319,44 @@ function Get-CombinedExclusionIds {
     return @($result | Sort-Object -Unique)
 }
 
+function Get-GitRepos {
+    param(
+        [Parameter(Mandatory)]
+        [AllowNull()]
+        [object]$StateObject
+    )
+
+    if ($null -eq $StateObject) { return @() }
+
+    $gitNode = Get-ObjectValue -Object $StateObject -Name "git"
+    if (-not $gitNode) { return @() }
+
+    $reposNode = Get-ObjectValue -Object $gitNode -Name "repos"
+    if (-not $reposNode) { return @() }
+
+    return @($reposNode)
+}
+
+function Merge-GitRepos {
+    param(
+        [AllowNull()]
+        [array]$Repos
+    )
+
+    $byUrl = @{}
+    foreach ($repo in @($Repos)) {
+        $url = Get-ObjectValue -Object $repo -Name "url"
+        if ($null -eq $repo -or -not $url) { continue }
+        $byUrl[[string]$url.ToLowerInvariant()] = $repo
+    }
+
+    $result = @()
+    foreach ($key in ($byUrl.Keys | Sort-Object)) {
+        $result += $byUrl[$key]
+    }
+    return $result
+}
+
 function Merge-MachineState {
     param(
         [Parameter(Mandatory)]
@@ -332,6 +370,7 @@ function Merge-MachineState {
     $msstorePackages = @()
     $npmPackages = @()
     $uvPackages = @()
+    $gitRepos = @()
 
     foreach ($relativePath in @($machineState.state)) {
         $resolvedSharedPath = Join-Path (Split-Path -Parent $MachineStatePath) $relativePath
@@ -342,6 +381,7 @@ function Merge-MachineState {
         $msstorePackages += @(Get-SourcePackages -StateObject $sharedState -SourceName "msstore")
         $npmPackages += @(Get-SectionPackages -StateObject $sharedState -SectionName "node" -SourceName "npm")
         $uvPackages += @(Get-SectionPackages -StateObject $sharedState -SectionName "uv" -SourceName "uv")
+        $gitRepos += @(Get-GitRepos -StateObject $sharedState)
     }
 
     $stateObjects += $machineState
@@ -350,6 +390,11 @@ function Merge-MachineState {
     $msstorePackages += @(Get-SourcePackages -StateObject $machineState -SourceName "msstore")
     $npmPackages += @(Get-SectionPackages -StateObject $machineState -SectionName "node" -SourceName "npm")
     $uvPackages += @(Get-SectionPackages -StateObject $machineState -SectionName "uv" -SourceName "uv")
+    $gitRepos += @(Get-GitRepos -StateObject $machineState)
+
+    # cloneRoot is machine-specific — read from machine YAML only
+    $machineGitNode = Get-ObjectValue -Object $machineState -Name "git"
+    $cloneRoot = if ($machineGitNode) { [string](Get-ObjectValue -Object $machineGitNode -Name "cloneRoot") } else { "" }
 
     $wingetExclusions = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "winget")
     $msstoreExclusions = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "msstore")
@@ -360,6 +405,7 @@ function Merge-MachineState {
     $mergedMsstorePackages = @(Merge-PackageSource -Packages $msstorePackages)
     $mergedNpmPackages = @(Merge-PackageSource -Packages $npmPackages)
     $mergedUvPackages = @(Merge-PackageSource -Packages $uvPackages)
+    $mergedGitRepos = @(Merge-GitRepos -Repos $gitRepos)
 
     if ($wingetExclusions.Count -gt 0) {
         $mergedWingetPackages = @(
@@ -431,6 +477,10 @@ function Merge-MachineState {
                 uv = $mergedUvPackages
             }
         }
+        git          = [ordered]@{
+            cloneRoot = $cloneRoot
+            repos     = $mergedGitRepos
+        }
     }
 
     return [pscustomobject]$merged
@@ -467,6 +517,8 @@ function Get-MachineContext {
         NodeExportPath   = Join-Path (Join-Path $workingPath "export") "node.npm.export.json"
         UvImportPath     = Join-Path (Join-Path $workingPath "build") "uv.tools.import.json"
         UvExportPath     = Join-Path (Join-Path $workingPath "export") "uv.tools.export.json"
+        GitExportPath    = Join-Path (Join-Path $workingPath "export") "git.export.json"
+        GitOpsPath       = Join-Path (Join-Path $workingPath "build") "git.ops.json"
     }
 
     New-DirectoryIfMissing -Path $context.WorkingPath

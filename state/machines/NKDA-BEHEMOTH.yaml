@@ -2,14 +2,19 @@ name: NKDA-BEHEMOTH
 platform: win
 architecture: x64
 
+git:
+  cloneRoot: "%USERPROFILE%\\source\\repos"
+
 state:
   - ../win/windows-common.yaml
   - ../win/windows-x64.yaml
+  - ../apps/git-common.yaml
 
 scripts:
   - Resolve-Winget.ps1
   - Resolve-Node.ps1
   - Resolve-Uv.ps1
+  - Resolve-Git.ps1
 
 exclusions:
   packages:

@@ -1,0 +1,5 @@
+git:
+  repos:
+    - url: https://github.com/nkdAgility/machine-state
+    - url: https://github.com/nkdAgility/azure-devops-migration-tools
+    - url: https://github.com/nkdAgility/NKDAgility.com
