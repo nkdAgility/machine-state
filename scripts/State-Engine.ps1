@@ -496,8 +496,9 @@ function Invoke-ResolverScript {
         throw "Resolver script not found: $resolverPath"
     }
 
-    # Only pass -WhatIf to Execute stage - merge/build must run to prepare files
-    $passWhatIf = ($Stage -eq "Execute") -and $WhatIfPreference
+    # All stages respect WhatIf; Merge always runs (forced via Invoke-StageMerge)
+    # so that Execute can compute what would happen even in WhatIf mode.
+    $passWhatIf = $WhatIfPreference
     & $resolverPath -Stage $Stage -Context $Context -WhatIf:$passWhatIf
 }
 
