@@ -610,6 +610,8 @@ function Invoke-ResolverScript {
     # All stages respect WhatIf; Merge always runs (forced via Invoke-StageMerge)
     # so that Execute can compute what would happen even in WhatIf mode.
     $passWhatIf = $WhatIfPreference
+    Write-Host ""
+    Write-Host "--- $Stage : $ScriptName ---" -ForegroundColor Cyan
     & $resolverPath -Stage $Stage -Context $Context -WhatIf:$passWhatIf
 }
 
@@ -622,6 +624,10 @@ function Invoke-StageExport {
         [object]$MachineState
     )
 
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor DarkCyan
+    Write-Host "  STAGE: Export  [$($Context.MachineName)]" -ForegroundColor DarkCyan
+    Write-Host "========================================" -ForegroundColor DarkCyan
     foreach ($scriptName in @($MachineState.scripts)) {
         Invoke-ResolverScript -ScriptName $scriptName -Stage Export -Context $Context
     }
@@ -831,6 +837,11 @@ function Invoke-StageMerge {
         [object]$MachineStateData = $null
     )
 
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor DarkCyan
+    Write-Host "  STAGE: Merge   [$($Context.MachineName)]" -ForegroundColor DarkCyan
+    Write-Host "========================================" -ForegroundColor DarkCyan
+
     # Merge must run even in WhatIf mode so Execute stage can read the result
     $savedWhatIf = $WhatIfPreference
     $script:WhatIfPreference = $false
@@ -839,6 +850,7 @@ function Invoke-StageMerge {
         $mergedState = Merge-MachineState -MachineStatePath $Context.MachineStatePath -MachineStateData $MachineStateData
         Write-YamlFile -Path $Context.MergedStateYaml -Value $mergedState
         $mergedState | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $Context.MergedStateJson -Encoding UTF8
+        Write-Host "Merged state written to $($Context.MergedStateYaml)"
     }
     finally {
         $script:WhatIfPreference = $savedWhatIf
@@ -854,6 +866,10 @@ function Invoke-StageBuild {
         [object]$MachineState
     )
 
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor DarkCyan
+    Write-Host "  STAGE: Build   [$($Context.MachineName)]" -ForegroundColor DarkCyan
+    Write-Host "========================================" -ForegroundColor DarkCyan
     foreach ($scriptName in @($MachineState.scripts)) {
         Invoke-ResolverScript -ScriptName $scriptName -Stage Build -Context $Context
     }
@@ -868,6 +884,10 @@ function Invoke-StageExecute {
         [object]$MachineState
     )
 
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor DarkCyan
+    Write-Host "  STAGE: Execute [$($Context.MachineName)]" -ForegroundColor DarkCyan
+    Write-Host "========================================" -ForegroundColor DarkCyan
     foreach ($scriptName in @($MachineState.scripts)) {
         Invoke-ResolverScript -ScriptName $scriptName -Stage Execute -Context $Context
     }

@@ -59,6 +59,7 @@ function Invoke-SetupStage {
 
             $state = @()
             foreach ($setting in $Settings) {
+                Write-Host "  Checking: $($setting.Name)..."
                 try   { $configured = [bool](& $setting.Check) }
                 catch { $configured = $false }
                 $state += [ordered]@{ name = $setting.Name; configured = $configured }
