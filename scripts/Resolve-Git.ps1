@@ -121,7 +121,7 @@ switch ($Stage) {
                 if (-not (Test-Path -LiteralPath $gitDir)) { continue }
 
                 $remoteUrl = (& git -C $dir.FullName remote get-url origin 2>$null)
-                if (-not $remoteUrl) { continue }
+                if (-not $remoteUrl) { $remoteUrl = "" }
 
                 $branch = (& git -C $dir.FullName branch --show-current 2>$null)
 
@@ -172,7 +172,8 @@ switch ($Stage) {
             $folder    = if ($rawFolder) { [string]$rawFolder } else { Get-RepoFolderName $url }
             $path      = Join-Path $config.CloneRoot $folder
 
-            if ($clonedUrls -contains (Normalize-RepoUrl $url)) {
+            $alreadyOnDisk = (Test-Path -LiteralPath $path)
+            if ($clonedUrls -contains (Normalize-RepoUrl $url) -or $alreadyOnDisk) {
                 $toPull += [ordered]@{ url = $url; path = $path; folder = $folder; managed = $true }
                 $pulledUrls.Add((Normalize-RepoUrl $url)) | Out-Null
             }
