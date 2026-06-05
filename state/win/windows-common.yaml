@@ -90,6 +90,7 @@ winget:
       name: 7zip.7zip
     - id: AgileBits.1Password
       required: true
+      priority: 10
       name: AgileBits.1Password
     - id: Anthropic.Claude
       required: true
@@ -145,6 +146,7 @@ winget:
       name: Foxit.PhantomPDF.Subscription.MSI
     - id: Git.Git
       required: true
+      priority: 10
       name: Git.Git
     - id: GitHub.cli
       required: true
@@ -307,7 +309,6 @@ winget:
       name: Microsoft.VisualStudioCode
     - id: Microsoft.VisualStudioCode.Insiders
       required: true
-      priority: 10
       name: Microsoft.VisualStudioCode.Insiders
     - id: Microsoft.VSTOR
       required: true
