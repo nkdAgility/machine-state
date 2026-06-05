@@ -544,14 +544,6 @@ function Get-MachineContext {
         LogsPath         = Join-Path $workingPath "logs"
         MergedStateYaml  = Join-Path (Join-Path $workingPath "merge") "machine-state.merged.yaml"
         MergedStateJson  = Join-Path (Join-Path $workingPath "merge") "machine-state.merged.json"
-        WingetImportPath = Join-Path (Join-Path $workingPath "build") "winget.import.json"
-        WingetExportPath = Join-Path (Join-Path $workingPath "export") "winget.export.json"
-        NodeImportPath   = Join-Path (Join-Path $workingPath "build") "node.npm.import.json"
-        NodeExportPath   = Join-Path (Join-Path $workingPath "export") "node.npm.export.json"
-        UvImportPath     = Join-Path (Join-Path $workingPath "build") "uv.tools.import.json"
-        UvExportPath     = Join-Path (Join-Path $workingPath "export") "uv.tools.export.json"
-        GitExportPath    = Join-Path (Join-Path $workingPath "export") "git.export.json"
-        GitOpsPath       = Join-Path (Join-Path $workingPath "build") "git.ops.json"
     }
 
     New-DirectoryIfMissing -Path $context.WorkingPath
@@ -678,8 +670,9 @@ function Invoke-StageIngest {
     }
 
     # Parse winget export
-    if (Test-Path -LiteralPath $Context.WingetExportPath) {
-        $wingetExport = Get-Content -LiteralPath $Context.WingetExportPath -Raw | ConvertFrom-Json
+    $wingetExportPath = Join-Path $Context.ExportPath "winget.export.json"
+    if (Test-Path -LiteralPath $wingetExportPath) {
+        $wingetExport = Get-Content -LiteralPath $wingetExportPath -Raw | ConvertFrom-Json
 
         foreach ($source in @($wingetExport.Sources)) {
             $sourceName = $source.SourceDetails.Name
@@ -707,8 +700,9 @@ function Invoke-StageIngest {
     }
 
     # Parse npm export
-    if (Test-Path -LiteralPath $Context.NodeExportPath) {
-        $npmExport = Get-Content -LiteralPath $Context.NodeExportPath -Raw | ConvertFrom-Json
+    $nodeExportPath = Join-Path $Context.ExportPath "node.npm.export.json"
+    if (Test-Path -LiteralPath $nodeExportPath) {
+        $npmExport = Get-Content -LiteralPath $nodeExportPath -Raw | ConvertFrom-Json
         foreach ($pkg in @($npmExport.packages)) {
             $pkgId = if ($pkg -is [string]) { $pkg } else { $pkg.id }
             if (-not $pkgId -or $pkgId -in $existingNpmIds) { continue }
@@ -721,8 +715,9 @@ function Invoke-StageIngest {
     }
 
     # Parse uv export
-    if (Test-Path -LiteralPath $Context.UvExportPath) {
-        $uvExport = Get-Content -LiteralPath $Context.UvExportPath -Raw | ConvertFrom-Json
+    $uvExportPath = Join-Path $Context.ExportPath "uv.tools.export.json"
+    if (Test-Path -LiteralPath $uvExportPath) {
+        $uvExport = Get-Content -LiteralPath $uvExportPath -Raw | ConvertFrom-Json
         foreach ($pkg in @($uvExport.packages)) {
             $pkgId = if ($pkg -is [string]) { $pkg } else { $pkg.id }
             if (-not $pkgId -or $pkgId -in $existingUvIds) { continue }

@@ -101,8 +101,8 @@ switch ($Stage) {
 
         $exportModel = [ordered]@{ packages = @($deps | Sort-Object id) }
 
-        if ($PSCmdlet.ShouldProcess($Context.NodeExportPath, "Export npm global packages")) {
-            $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $Context.NodeExportPath -Encoding UTF8
+        if ($PSCmdlet.ShouldProcess((Join-Path $Context.ExportPath "node.npm.export.json"), "Export npm global packages")) {
+            $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Context.ExportPath "node.npm.export.json") -Encoding UTF8
         }
     }
 
@@ -131,8 +131,8 @@ switch ($Stage) {
             packages       = @($names)
         }
 
-        if ($PSCmdlet.ShouldProcess($Context.NodeImportPath, "Write npm import manifest")) {
-            $importModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Context.NodeImportPath -Encoding UTF8
+        if ($PSCmdlet.ShouldProcess((Join-Path $Context.BuildPath "node.npm.import.json"), "Write npm import manifest")) {
+            $importModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Context.BuildPath "node.npm.import.json") -Encoding UTF8
         }
 
         # Detect outdated npm packages (filtered to desired packages) - skip if npm not available yet
@@ -181,11 +181,11 @@ switch ($Stage) {
     "Execute" {
         Install-NodeIfMissing
 
-        if (-not (Test-Path -LiteralPath $Context.NodeImportPath)) {
-            throw "npm import manifest was not found at '$($Context.NodeImportPath)'. Run build first."
+        if (-not (Test-Path -LiteralPath (Join-Path $Context.BuildPath "node.npm.import.json"))) {
+            throw "npm import manifest was not found at '$((Join-Path $Context.BuildPath "node.npm.import.json"))'. Run build first."
         }
 
-        $manifest = Get-Content -LiteralPath $Context.NodeImportPath -Raw | ConvertFrom-Json
+        $manifest = Get-Content -LiteralPath (Join-Path $Context.BuildPath "node.npm.import.json") -Raw | ConvertFrom-Json
         $desiredPkgs = @($manifest.packages)
 
         if ($desiredPkgs.Count -eq 0) {
@@ -194,8 +194,8 @@ switch ($Stage) {
 
         if ($WhatIfPreference) {
             $installedPkgs = @()
-            if (Test-Path -LiteralPath $Context.NodeExportPath) {
-                $exportDoc = Get-Content -LiteralPath $Context.NodeExportPath -Raw | ConvertFrom-Json
+            if (Test-Path -LiteralPath (Join-Path $Context.ExportPath "node.npm.export.json")) {
+                $exportDoc = Get-Content -LiteralPath (Join-Path $Context.ExportPath "node.npm.export.json") -Raw | ConvertFrom-Json
                 $installedPkgs = @($exportDoc.packages | ForEach-Object { $_.id })
             }
 

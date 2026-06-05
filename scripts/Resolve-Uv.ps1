@@ -126,8 +126,8 @@ switch ($Stage) {
 
         $exportModel.packages = @($exportModel.packages | Sort-Object id -Unique)
 
-        if ($PSCmdlet.ShouldProcess($Context.UvExportPath, "Export uv tools")) {
-            $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $Context.UvExportPath -Encoding UTF8
+        if ($PSCmdlet.ShouldProcess((Join-Path $Context.ExportPath "uv.tools.export.json"), "Export uv tools")) {
+            $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Context.ExportPath "uv.tools.export.json") -Encoding UTF8
         }
     }
 
@@ -156,19 +156,19 @@ switch ($Stage) {
             packages       = @($names)
         }
 
-        if ($PSCmdlet.ShouldProcess($Context.UvImportPath, "Write uv tool import manifest")) {
-            $importModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Context.UvImportPath -Encoding UTF8
+        if ($PSCmdlet.ShouldProcess((Join-Path $Context.BuildPath "uv.tools.import.json"), "Write uv tool import manifest")) {
+            $importModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Context.BuildPath "uv.tools.import.json") -Encoding UTF8
         }
     }
 
     "Execute" {
         Install-UvIfMissing
 
-        if (-not (Test-Path -LiteralPath $Context.UvImportPath)) {
-            throw "uv import manifest was not found at '$($Context.UvImportPath)'. Run build first."
+        if (-not (Test-Path -LiteralPath (Join-Path $Context.BuildPath "uv.tools.import.json"))) {
+            throw "uv import manifest was not found at '$((Join-Path $Context.BuildPath "uv.tools.import.json"))'. Run build first."
         }
 
-        $manifest = Get-Content -LiteralPath $Context.UvImportPath -Raw | ConvertFrom-Json
+        $manifest = Get-Content -LiteralPath (Join-Path $Context.BuildPath "uv.tools.import.json") -Raw | ConvertFrom-Json
         $desiredPkgs = @($manifest.packages)
 
         if ($desiredPkgs.Count -eq 0) {
@@ -177,8 +177,8 @@ switch ($Stage) {
 
         if ($WhatIfPreference) {
             $installedPkgs = @()
-            if (Test-Path -LiteralPath $Context.UvExportPath) {
-                $exportDoc = Get-Content -LiteralPath $Context.UvExportPath -Raw | ConvertFrom-Json
+            if (Test-Path -LiteralPath (Join-Path $Context.ExportPath "uv.tools.export.json")) {
+                $exportDoc = Get-Content -LiteralPath (Join-Path $Context.ExportPath "uv.tools.export.json") -Raw | ConvertFrom-Json
                 $installedPkgs = @($exportDoc.packages | ForEach-Object { $_.id })
             }
 

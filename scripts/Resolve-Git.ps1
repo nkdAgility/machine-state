@@ -138,8 +138,8 @@ switch ($Stage) {
             repos     = @($found | Sort-Object url)
         }
 
-        if ($PSCmdlet.ShouldProcess($Context.GitExportPath, "Export git repos")) {
-            $exportModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Context.GitExportPath -Encoding UTF8
+        if ($PSCmdlet.ShouldProcess($(Join-Path $Context.ExportPath "git.export.json"), "Export git repos")) {
+            $exportModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $(Join-Path $Context.ExportPath "git.export.json") -Encoding UTF8
         }
 
         Write-Host "$($found.Count) git repo(s) found under $($config.CloneRoot)"
@@ -156,8 +156,8 @@ switch ($Stage) {
 
         # Load already-cloned repos from export
         $clonedUrls = @()
-        if (Test-Path -LiteralPath $Context.GitExportPath) {
-            $export = Get-Content -LiteralPath $Context.GitExportPath -Raw | ConvertFrom-Json
+        if (Test-Path -LiteralPath $(Join-Path $Context.ExportPath "git.export.json")) {
+            $export = Get-Content -LiteralPath $(Join-Path $Context.ExportPath "git.export.json") -Raw | ConvertFrom-Json
             $clonedUrls = @($export.repos | ForEach-Object { Normalize-RepoUrl $_.url })
         }
 
@@ -183,8 +183,8 @@ switch ($Stage) {
         }
 
         # Extra local repos not in desired state: pull only, never clone
-        if (Test-Path -LiteralPath $Context.GitExportPath) {
-            $export = Get-Content -LiteralPath $Context.GitExportPath -Raw | ConvertFrom-Json
+        if (Test-Path -LiteralPath $(Join-Path $Context.ExportPath "git.export.json")) {
+            $export = Get-Content -LiteralPath $(Join-Path $Context.ExportPath "git.export.json") -Raw | ConvertFrom-Json
             foreach ($found in @($export.repos)) {
                 if (-not $pulledUrls.Contains((Normalize-RepoUrl $found.url))) {
                     $folder = Split-Path -Leaf $found.path
@@ -200,8 +200,8 @@ switch ($Stage) {
             pull      = $toPull
         }
 
-        if ($PSCmdlet.ShouldProcess($Context.GitOpsPath, "Write git ops manifest")) {
-            $ops | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Context.GitOpsPath -Encoding UTF8
+        if ($PSCmdlet.ShouldProcess($(Join-Path $Context.BuildPath "git.ops.json"), "Write git ops manifest")) {
+            $ops | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $(Join-Path $Context.BuildPath "git.ops.json") -Encoding UTF8
         }
 
         $extraCount = ($toPull | Where-Object { -not (Get-SafeProperty $_ 'managed') }).Count
@@ -211,11 +211,11 @@ switch ($Stage) {
     "Execute" {
         Install-GitIfMissing
 
-        if (-not (Test-Path -LiteralPath $Context.GitOpsPath)) {
-            throw "git ops manifest not found at '$($Context.GitOpsPath)'. Run build first."
+        if (-not (Test-Path -LiteralPath $(Join-Path $Context.BuildPath "git.ops.json"))) {
+            throw "git ops manifest not found at '$($(Join-Path $Context.BuildPath "git.ops.json"))'. Run build first."
         }
 
-        $ops = Get-Content -LiteralPath $Context.GitOpsPath -Raw | ConvertFrom-Json
+        $ops = Get-Content -LiteralPath $(Join-Path $Context.BuildPath "git.ops.json") -Raw | ConvertFrom-Json
 
         $toClone = @($ops.clone)
         $toPull  = @($ops.pull)

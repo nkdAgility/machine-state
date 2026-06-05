@@ -107,7 +107,7 @@ try {
             if (-not (Test-Path -LiteralPath $context.MergedStateYaml)) {
                 Invoke-StageMerge -Context $context -MachineStateData $machineState
             }
-            if (-not (Test-Path -LiteralPath $context.WingetImportPath)) {
+            if ((Get-ChildItem -LiteralPath $context.BuildPath -ErrorAction SilentlyContinue | Measure-Object).Count -eq 0) {
                 Invoke-StageBuild -Context $context -MachineState $machineState
             }
             Invoke-StageExecute -Context $context -MachineState $machineState
