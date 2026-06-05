@@ -13,7 +13,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "Setup-Engine.ps1")
+. (Join-Path $PSScriptRoot "..\..\Setup-Engine.ps1")
 
 $catalog = @(
 

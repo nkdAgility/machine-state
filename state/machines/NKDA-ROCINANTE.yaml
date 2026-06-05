@@ -8,9 +8,9 @@ state:
   - ../common.yaml
 
 scripts:
-  - Resolve-Winget.ps1
-  - Resolve-Node.ps1
-  - Resolve-Uv.ps1
+  - systems\Winget\Resolve.ps1
+  - systems\Node\Resolve.ps1
+  - systems\Uv\Resolve.ps1
 
 exclusions:
   packages:

@@ -39,13 +39,13 @@ merge, build, and execute pipeline:
 
 | Concern | Canonical YAML location | Resolver script |
 |---------|------------------------|-----------------|
-| Winget packages | `state/win/*.yaml`, `state/machines/<Name>.yaml` | `Resolve-Winget.ps1` |
-| Node / npm globals | `state/win/windows-common.yaml` | `Resolve-Node.ps1` |
-| Python / uv tools | `state/win/windows-common.yaml` | `Resolve-Uv.ps1` |
-| .NET global tools | `state/common.yaml` | `Resolve-DotNet.ps1` |
-| PowerShell modules | `state/common.yaml` | `Resolve-PSModule.ps1` |
-| Git repositories | `state/common.yaml` | `Resolve-GitRepos.ps1` |
-| Windows OS setup | `state/win/windows-common.yaml` (`setup.windows`) | `Resolve-WindowsSetup.ps1` |
+| Winget packages | `state/win/*.yaml`, `state/machines/<Name>.yaml` | `systems/Winget/Resolve.ps1` |
+| Node / npm globals | `state/win/windows-common.yaml` | `systems/Node/Resolve.ps1` |
+| Python / uv tools | `state/win/windows-common.yaml` | `systems/Uv/Resolve.ps1` |
+| .NET global tools | `state/common.yaml` | `systems/DotNet/Resolve.ps1` |
+| PowerShell modules | `state/common.yaml` | `systems/PSModule/Resolve.ps1` |
+| Git repositories | `state/common.yaml` | `systems/GitRepos/Resolve.ps1` |
+| Windows OS setup | `state/win/windows-common.yaml` (`setup.windows`) | `systems/WindowsSetup/Resolve.ps1` |
 | Git app config | `state/common.yaml` (`setup.git`) | `Resolve-GitSetup.ps1` |
 
 **Do not put primary state in `scripts/apps/`.** It belongs in `state/` so the
@@ -96,15 +96,15 @@ scripts/
   State-Engine.ps1
   Setup-Engine.ps1
   Resolver-Common.ps1
-  Resolve-WindowsSetup.ps1   ← Windows OS configuration
-  Resolve-GitSetup.ps1       ← git app configuration
-  Resolve-Winget.ps1         ← winget packages
-  Resolve-DotNet.ps1         ← dotnet global tools
-  Resolve-PSModule.ps1       ← PowerShell modules
-  Resolve-Node.ps1           ← npm global packages
-  Resolve-Uv.ps1             ← uv tools
-  Resolve-GitRepos.ps1       ← git repo clone/pull
-  Resolve-GitReposCleanup.ps1 ← git branch cleanup
+  systems/
+    WindowsSetup/Resolve.ps1   ← Windows OS configuration
+    Winget/Resolve.ps1         ← winget packages
+    DotNet/Resolve.ps1         ← dotnet global tools
+    PSModule/Resolve.ps1       ← PowerShell modules
+    Node/Resolve.ps1           ← npm global packages
+    Uv/Resolve.ps1             ← uv tools
+    GitRepos/Resolve.ps1       ← git repo clone/pull
+    GitReposCleanup/Resolve.ps1 ← git branch cleanup
   apps/
     Git.Git/Resolve.ps1
     JanDeDobbeleer.OhMyPosh/Resolve.ps1

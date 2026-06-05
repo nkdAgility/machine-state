@@ -11,14 +11,14 @@ state:
   - ../common.yaml
 
 scripts:
-  - Resolve-WindowsSetup.ps1
-  - Resolve-Winget.ps1
-  - Resolve-DotNet.ps1
-  - Resolve-PSModule.ps1
-  - Resolve-Node.ps1
-  - Resolve-Uv.ps1
-  - Resolve-GitRepos.ps1
-  - Resolve-GitReposCleanup.ps1
+  - systems\WindowsSetup\Resolve.ps1
+  - systems\Winget\Resolve.ps1
+  - systems\DotNet\Resolve.ps1
+  - systems\PSModule\Resolve.ps1
+  - systems\Node\Resolve.ps1
+  - systems\Uv\Resolve.ps1
+  - systems\GitRepos\Resolve.ps1
+  - systems\GitReposCleanup\Resolve.ps1
 
 exclusions:
   packages:

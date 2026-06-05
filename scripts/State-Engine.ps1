@@ -641,8 +641,9 @@ function Invoke-ResolverScript {
     # All stages respect WhatIf; Merge always runs (forced via Invoke-StageMerge)
     # so that Execute can compute what would happen even in WhatIf mode.
     $passWhatIf = $WhatIfPreference
+    $label = Split-Path -Leaf (Split-Path -Parent $resolverPath)
     Write-Host ""
-    Write-Host "--- $Stage : $ScriptName ---" -ForegroundColor Cyan
+    Write-Host "--- $Stage : $label ---" -ForegroundColor Cyan
     & $resolverPath -Stage $Stage -Context $Context -WhatIf:$passWhatIf
 }
 

@@ -13,7 +13,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "Resolver-Common.ps1")
+. (Join-Path $PSScriptRoot "..\..\Resolver-Common.ps1")
 
 function Invoke-AppResolver {
     param(
@@ -28,7 +28,7 @@ function Invoke-AppResolver {
         [pscustomobject]$Context
     )
 
-    $resolverPath = Join-Path $PSScriptRoot "apps\$PackageId\Resolve.ps1"
+    $resolverPath = Join-Path $PSScriptRoot "..\..\apps\$PackageId\Resolve.ps1"
     if (-not (Test-Path -LiteralPath $resolverPath)) { return }
 
     Write-Host ""
@@ -46,7 +46,7 @@ function Invoke-AllAppResolvers {
         [pscustomobject]$Context
     )
 
-    $appsRoot = Join-Path $PSScriptRoot "apps"
+    $appsRoot = Join-Path $PSScriptRoot "..\..\apps"
     if (-not (Test-Path -LiteralPath $appsRoot)) { return }
 
     foreach ($resolverFile in (Get-ChildItem -LiteralPath $appsRoot -Filter "Resolve.ps1" -Recurse)) {

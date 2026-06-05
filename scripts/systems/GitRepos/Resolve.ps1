@@ -13,7 +13,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "Resolver-Common.ps1")
+. (Join-Path $PSScriptRoot "..\..\Resolver-Common.ps1")
 
 
 function Get-RepoFolderName {
