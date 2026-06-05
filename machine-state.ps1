@@ -46,7 +46,7 @@ try {
     $resolvedMachineName = Resolve-MachineName -RequestedMachineName $MachineName
     $machineStatePath = Get-MachineStatePath -ResolvedMachineName $resolvedMachineName
     $machineState = Read-YamlFile -Path $machineStatePath
-    $context = Get-MachineContext -ResolvedMachineName $resolvedMachineName -MachineStatePath $machineStatePath
+    $context = Get-MachineContext -ResolvedMachineName $resolvedMachineName -MachineStatePath $machineStatePath -MachineStateData $machineState
 
     switch ($Action) {
         "status" {
@@ -59,7 +59,7 @@ try {
             }
         }
         "apply" {
-            Invoke-StageMerge -Context $context
+            Invoke-StageMerge -Context $context -MachineStateData $machineState
             Invoke-StageBuild -Context $context -MachineState $machineState
             if (-not $BuildOnly) {
                 Invoke-StageExecute -Context $context -MachineState $machineState
@@ -69,7 +69,7 @@ try {
             if (-not $ExportOnly) {
                 Invoke-StageExport -Context $context -MachineState $machineState
             }
-            Invoke-StageMerge -Context $context
+            Invoke-StageMerge -Context $context -MachineStateData $machineState
             Invoke-StageBuild -Context $context -MachineState $machineState
             if (-not $BuildOnly) {
                 Invoke-StageExecute -Context $context -MachineState $machineState
@@ -80,17 +80,17 @@ try {
             Invoke-StageExport -Context $context -MachineState $machineState
         }
         "merge" {
-            Invoke-StageMerge -Context $context
+            Invoke-StageMerge -Context $context -MachineStateData $machineState
         }
         "build" {
             if (-not (Test-Path -LiteralPath $context.MergedStateYaml)) {
-                Invoke-StageMerge -Context $context
+                Invoke-StageMerge -Context $context -MachineStateData $machineState
             }
             Invoke-StageBuild -Context $context -MachineState $machineState
         }
         "execute" {
             if (-not (Test-Path -LiteralPath $context.MergedStateYaml)) {
-                Invoke-StageMerge -Context $context
+                Invoke-StageMerge -Context $context -MachineStateData $machineState
             }
             if (-not (Test-Path -LiteralPath $context.WingetImportPath)) {
                 Invoke-StageBuild -Context $context -MachineState $machineState

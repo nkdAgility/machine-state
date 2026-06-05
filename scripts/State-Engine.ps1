@@ -322,10 +322,12 @@ function Get-CombinedExclusionIds {
 function Merge-MachineState {
     param(
         [Parameter(Mandatory)]
-        [string]$MachineStatePath
+        [string]$MachineStatePath,
+
+        [object]$MachineStateData = $null
     )
 
-    $machineState = Read-YamlFile -Path $MachineStatePath
+    $machineState = if ($null -ne $MachineStateData) { $MachineStateData } else { Read-YamlFile -Path $MachineStatePath }
     $stateObjects = @()
 
     $wingetPackages = @()
@@ -442,10 +444,12 @@ function Get-MachineContext {
         [string]$ResolvedMachineName,
 
         [Parameter(Mandatory)]
-        [string]$MachineStatePath
+        [string]$MachineStatePath,
+
+        [object]$MachineStateData = $null
     )
 
-    $machineState = Read-YamlFile -Path $MachineStatePath
+    $machineState = if ($null -ne $MachineStateData) { $MachineStateData } else { Read-YamlFile -Path $MachineStatePath }
     $workingPath = Join-Path $WorkingRoot $ResolvedMachineName
 
     $context = [pscustomobject]@{
@@ -711,7 +715,9 @@ function Invoke-StageIngest {
 function Invoke-StageMerge {
     param(
         [Parameter(Mandatory)]
-        [pscustomobject]$Context
+        [pscustomobject]$Context,
+
+        [object]$MachineStateData = $null
     )
 
     # Merge must run even in WhatIf mode so Execute stage can read the result
@@ -719,7 +725,7 @@ function Invoke-StageMerge {
     $script:WhatIfPreference = $false
 
     try {
-        $mergedState = Merge-MachineState -MachineStatePath $Context.MachineStatePath
+        $mergedState = Merge-MachineState -MachineStatePath $Context.MachineStatePath -MachineStateData $MachineStateData
         Write-YamlFile -Path $Context.MergedStateYaml -Value $mergedState
         $mergedState | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $Context.MergedStateJson -Encoding UTF8
     }
