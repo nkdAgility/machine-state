@@ -16,11 +16,7 @@ $StateScenePath = Join-Path $Context.RepositoryRoot "state\config\OBSProject.OBS
 
 Write-Host "  [obs] Capture: saving current OBS scene collections to repo..."
 
-if (-not (Test-Path $OBSScenesPath)) {
-    Write-Warning "  [obs] OBS scenes folder not found at '$OBSScenesPath' - skipping."
-    return
-}
-
+New-DirectoryIfMissing -Path $OBSScenesPath
 New-DirectoryIfMissing -Path $StateScenePath
 
 $scenes = Get-ChildItem -Path $OBSScenesPath -Filter "*.json"

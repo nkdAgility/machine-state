@@ -9,22 +9,16 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "..\..\Resolver-Common.ps1")
+$StateConfigDir = Join-Path $Context.RepositoryRoot "state\config\Elgato.StreamDeck"
 
-$StreamDeckAppData = Join-Path $env:APPDATA "Elgato\StreamDeck\ProfilesV2"
-$BackupPath        = Join-Path $Context.RepositoryRoot "state\config\Elgato.StreamDeck\stream-deck-profiles.streamDeckProfilesBackup"
+Write-Warning "  [stream-deck] *** MANUAL ACTION REQUIRED ***"
+Write-Warning "  [stream-deck] Stream Deck profiles cannot be exported automatically."
+Write-Warning "  [stream-deck] Export the backup through the Stream Deck application:"
+Write-Warning "  [stream-deck]   1. Open Stream Deck"
+Write-Warning "  [stream-deck]   2. Go to Settings > Profiles"
+Write-Warning "  [stream-deck]   3. Click the down arrow > Export backup..."
+Write-Warning "  [stream-deck]   4. Save to: $StateConfigDir\stream-deck-profiles.streamDeckProfilesBackup"
 
-Write-Host "  [stream-deck] Capture: saving current Stream Deck profiles to repo..."
-
-if (-not (Test-Path $StreamDeckAppData)) {
-    Write-Warning "  [stream-deck] ProfilesV2 folder not found at '$StreamDeckAppData' - skipping."
-    return
-}
-
-New-DirectoryIfMissing -Path (Split-Path -Parent $BackupPath)
-
-if ($PSCmdlet.ShouldProcess($BackupPath, "Update Stream Deck backup")) {
-    if (Test-Path $BackupPath) { Remove-Item $BackupPath -Force }
-    Compress-Archive -Path "$StreamDeckAppData\*" -DestinationPath $BackupPath
-    Write-Host "  [stream-deck] Profiles saved: '$BackupPath'"
+if ($PSCmdlet.ShouldProcess($StateConfigDir, "Open backup destination in Explorer")) {
+    Start-Process explorer.exe -ArgumentList "`"$StateConfigDir`""
 }
