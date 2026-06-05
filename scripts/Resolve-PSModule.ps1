@@ -184,7 +184,7 @@ switch ($Stage) {
                         Install-Module -Name $item.id -Scope AllUsers -Force -AllowClobber -Repository PSGallery
                     }
                     else {
-                        Update-Module -Name $item.id -Force
+                        Update-Module -Name $item.id -Scope AllUsers -Force
                     }
                     Write-Host "$tag Done"
                 }
