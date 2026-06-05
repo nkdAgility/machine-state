@@ -311,12 +311,14 @@ function Get-CombinedExclusionIds {
         [string]$SourceName
     )
 
-    $result = @()
+    $result = [System.Collections.Generic.List[string]]::new()
     foreach ($stateObject in @($StateObjects)) {
-        $result += @(Get-ExclusionIds -StateObject $stateObject -SourceName $SourceName)
+        foreach ($id in @(Get-ExclusionIds -StateObject $stateObject -SourceName $SourceName)) {
+            $result.Add([string]$id)
+        }
     }
 
-    return @($result | Sort-Object -Unique)
+    [string[]]($result | Sort-Object -Unique)
 }
 
 function Get-SetupTopicIds {
@@ -335,7 +337,7 @@ function Get-SetupTopicIds {
 
 function Merge-SetupTopicIds {
     param([AllowNull()][array]$Ids)
-    return @($Ids | Where-Object { $_ } | ForEach-Object { [string]$_ } | Sort-Object -Unique)
+    [string[]]($Ids | Where-Object { $_ } | ForEach-Object { [string]$_ } | Sort-Object -Unique)
 }
 
 function Get-GitRepos {
@@ -501,11 +503,11 @@ function Merge-MachineState {
         scripts      = @($machineState.scripts)
         exclusions   = [ordered]@{
             packages = [ordered]@{
-                winget     = $wingetExclusions
-                msstore    = $msstoreExclusions
-                npm        = $npmExclusions
-                uv         = $uvExclusions
-                psgallery  = $psgalleryExclusions
+                winget     = [string[]]$wingetExclusions
+                msstore    = [string[]]$msstoreExclusions
+                npm        = [string[]]$npmExclusions
+                uv         = [string[]]$uvExclusions
+                psgallery  = [string[]]$psgalleryExclusions
             }
         }
         winget       = [ordered]@{
@@ -539,8 +541,8 @@ function Merge-MachineState {
             repos     = $mergedGitRepos
         }
         setup        = [ordered]@{
-            windows = @(Merge-SetupTopicIds -Ids $setupWindows)
-            git     = @(Merge-SetupTopicIds -Ids $setupGit)
+            windows = [string[]](Merge-SetupTopicIds -Ids $setupWindows)
+            git     = [string[]](Merge-SetupTopicIds -Ids $setupGit)
         }
     }
 
