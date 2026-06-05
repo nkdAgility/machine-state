@@ -41,6 +41,20 @@ Supported machines:
 
 ---
 
+## State File Routing
+
+Use the correct file based on scope. **If it is cross-platform and not machine-specific, it goes in `state/common.yaml`.**
+
+| Scope | File | What belongs here |
+|-------|------|-------------------|
+| **Cross-platform, every machine** | `state/common.yaml` | dotnet global tools, PS modules, git repos, `setup.git` IDs |
+| **Windows, every Windows machine** | `state/win/windows-common.yaml` | winget packages, npm globals, uv tools, `setup.windows` IDs |
+| **Windows x64 only** | `state/win/windows-x64.yaml` | x64-specific winget packages |
+| **Windows ARM64 only** | `state/win/windows-arm64.yaml` | ARM64-specific winget packages |
+| **One specific machine** | `state/machines/<Name>.yaml` | machine-unique packages, `git.cloneRoot`, scripts list |
+
+---
+
 ## Repository Structure
 
 ```text
@@ -48,31 +62,34 @@ machine-state/
   machine-state.ps1
 
   state/
+    common.yaml               ← cross-platform, every machine
     machines/
       NKDA-BEHEMOTH.yaml
       NKDA-ROCINANTE.yaml
-
     win/
-      windows-common.yaml
-      windows-x64.yaml
-      windows-arm64.yaml
-
-    apps/
-      git-common.yaml
+      windows-common.yaml     ← all Windows machines
+      windows-x64.yaml        ← x64 only
+      windows-arm64.yaml      ← ARM64 only
+    config/
+      <Publisher.AppName>/    ← per-app config files
 
   scripts/
     State-Engine.ps1
     Setup-Engine.ps1
     Resolver-Common.ps1
+    Resolve-WindowsSetup.ps1
+    Resolve-GitSetup.ps1
     Resolve-Winget.ps1
+    Resolve-DotNet.ps1
+    Resolve-PSModule.ps1
     Resolve-Node.ps1
     Resolve-Uv.ps1
-    Resolve-Git.ps1
-    Resolve-GitCleanup.ps1
-    Resolve-WindowsSetup.ps1
+    Resolve-GitRepos.ps1
+    Resolve-GitReposCleanup.ps1
     apps/
       Git.Git/
       JanDeDobbeleer.OhMyPosh/
+      Elgato.StreamDeck/
 
   working/
     <MachineName>/
@@ -84,12 +101,10 @@ machine-state/
   docs/
     spec.md
 
-  config/
-
   .gitignore
 ```
 
-`working/` is Git-ignored except for `.gitkeep`. `state/` and `scripts/` are committed. `config/` holds optional per-app configuration data (e.g., Stream Deck layouts).
+`working/` is Git-ignored except for `.gitkeep`. `state/` and `scripts/` are committed. `state/config/` holds per-app configuration data committed to the repo (e.g. Stream Deck profiles, Oh My Posh themes).
 
 ---
 
