@@ -148,7 +148,7 @@ switch ($Stage) {
         Assert-WingetAvailable
         New-DirectoryIfMissing -Path $Context.ExportPath
 
-        if ($PSCmdlet.ShouldProcess($Context.WingetExportPath, "Export Winget state")) {
+        if ($PSCmdlet.ShouldProcess((Join-Path $Context.ExportPath "winget.export.json"), "Export Winget state")) {
             $unavailablePath = Join-Path $Context.ExportPath "winget.unavailable.json"
             $licensePath     = Join-Path $Context.ExportPath "winget.license-required.json"
             $exportLogPath   = Join-Path $Context.LogsPath  "winget.export.log"
@@ -159,7 +159,7 @@ switch ($Stage) {
             $stdoutFile = [System.IO.Path]::GetTempFileName()
             $stderrFile = [System.IO.Path]::GetTempFileName()
             try {
-                & winget export --output $Context.WingetExportPath --accept-source-agreements 2>$stderrFile | Out-File -LiteralPath $stdoutFile -Encoding UTF8
+                & winget export --output (Join-Path $Context.ExportPath "winget.export.json") --accept-source-agreements 2>$stderrFile | Out-File -LiteralPath $stdoutFile -Encoding UTF8
                 $exitCode = $LASTEXITCODE
 
                 # Merge stdout + stderr into a single log file
@@ -260,8 +260,8 @@ switch ($Stage) {
             $importModel.WinGetVersion = $wingetVersion
         }
 
-        if ($PSCmdlet.ShouldProcess($Context.WingetImportPath, "Write Winget import JSON")) {
-            $importModel | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $Context.WingetImportPath -Encoding UTF8
+        if ($PSCmdlet.ShouldProcess((Join-Path $Context.BuildPath "winget.import.json"), "Write Winget import JSON")) {
+            $importModel | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $Context.BuildPath "winget.import.json") -Encoding UTF8
         }
 
         # Detect packages with available upgrades (filtered to automated desired packages only)
@@ -312,11 +312,11 @@ switch ($Stage) {
     "Execute" {
         Assert-WingetAvailable
 
-        if (-not (Test-Path -LiteralPath $Context.WingetImportPath)) {
-            throw "Winget import file was not found at '$($Context.WingetImportPath)'. Run build first."
+        if (-not (Test-Path -LiteralPath (Join-Path $Context.BuildPath "winget.import.json"))) {
+            throw "Winget import file was not found at '$((Join-Path $Context.BuildPath "winget.import.json"))'. Run build first."
         }
 
-        $importDoc = Get-Content -LiteralPath $Context.WingetImportPath -Raw | ConvertFrom-Json
+        $importDoc = Get-Content -LiteralPath (Join-Path $Context.BuildPath "winget.import.json") -Raw | ConvertFrom-Json
         $desiredWinget = @($importDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget' } | ForEach-Object { $_.Packages.PackageIdentifier })
         $desiredMsstore = @($importDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages.PackageIdentifier })
 
@@ -324,13 +324,13 @@ switch ($Stage) {
             # Compare with export to show only what's actually missing
             $installedWinget = @()
             $installedMsstore = @()
-            if (Test-Path -LiteralPath $Context.WingetExportPath) {
-                $exportDoc = Get-Content -LiteralPath $Context.WingetExportPath -Raw | ConvertFrom-Json
+            if (Test-Path -LiteralPath (Join-Path $Context.ExportPath "winget.export.json")) {
+                $exportDoc = Get-Content -LiteralPath (Join-Path $Context.ExportPath "winget.export.json") -Raw | ConvertFrom-Json
                 $installedWinget = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget' } | ForEach-Object { $_.Packages.PackageIdentifier })
                 $installedMsstore = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages.PackageIdentifier })
             }
             else {
-                Write-Warning "No export found at $($Context.WingetExportPath) - run 'capture' first for accurate diff. Showing all desired packages."
+                Write-Warning "No export found at $((Join-Path $Context.ExportPath "winget.export.json")) - run 'capture' first for accurate diff. Showing all desired packages."
             }
 
             $missingWinget = @($desiredWinget | Where-Object { $installedWinget -notcontains $_ } | Sort-Object)
@@ -385,8 +385,8 @@ switch ($Stage) {
         # Diff desired vs installed so we only attempt packages that are actually missing
         $installedWinget = @()
         $installedMsstore = @()
-        if (Test-Path -LiteralPath $Context.WingetExportPath) {
-            $exportDoc = Get-Content -LiteralPath $Context.WingetExportPath -Raw | ConvertFrom-Json
+        if (Test-Path -LiteralPath (Join-Path $Context.ExportPath "winget.export.json")) {
+            $exportDoc = Get-Content -LiteralPath (Join-Path $Context.ExportPath "winget.export.json") -Raw | ConvertFrom-Json
             $installedWinget  = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget'  } | ForEach-Object { $_.Packages.PackageIdentifier })
             $installedMsstore = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages.PackageIdentifier })
         }
