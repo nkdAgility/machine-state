@@ -140,7 +140,7 @@ winget:
       required: true
       name: Foxit.FoxitReader
     - id: Foxit.PhantomPDF.Subscription.MSI
-      required: true
+      manual: true
       name: Foxit.PhantomPDF.Subscription.MSI
     - id: Git.Git
       required: true
