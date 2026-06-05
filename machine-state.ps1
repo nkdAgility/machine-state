@@ -80,7 +80,8 @@ try {
                 & git -C $context.RepositoryRoot add --all
                 $machineName = $env:COMPUTERNAME
                 & git -C $context.RepositoryRoot commit -m "capture: update state from $machineName"
-                Write-Host "  [capture] Committed."
+                & git -C $context.RepositoryRoot push
+                Write-Host "  [capture] Committed and pushed."
             } else {
                 Write-Host "  [capture] No changes to commit."
             }
