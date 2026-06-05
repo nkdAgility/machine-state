@@ -404,8 +404,8 @@ switch ($Stage) {
 
         # Build a flat ordered work list so we can show unified progress
         $workList = @(
-            @($missingWinget  | ForEach-Object { [ordered]@{ action = "install"; source = "winget";  id = $_ } }),
-            @($missingMsstore | ForEach-Object { [ordered]@{ action = "install"; source = "msstore"; id = $_ } }),
+            @($missingWinget  | ForEach-Object { [ordered]@{ action = "install"; source = "winget";  id = $_ } }) +
+            @($missingMsstore | ForEach-Object { [ordered]@{ action = "install"; source = "msstore"; id = $_ } }) +
             @($upgradeableWinget | ForEach-Object { [ordered]@{ action = "upgrade"; source = "winget"; id = $_.id; from = $_.installed; to = $_.available } })
         )
 
