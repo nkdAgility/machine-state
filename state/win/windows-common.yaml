@@ -93,6 +93,7 @@ winget:
       name: AgileBits.1Password
     - id: Anthropic.Claude
       required: true
+      priority: 10
       name: Anthropic.Claude
     - id: Anysphere.Cursor
       required: true
@@ -228,6 +229,7 @@ winget:
       name: Microsoft.DotNet.Runtime.10
     - id: Microsoft.DotNet.SDK.10
       required: true
+      priority: 10
       name: Microsoft.DotNet.SDK.10
     - id: Microsoft.Edge
       required: true
@@ -255,6 +257,7 @@ winget:
       name: Microsoft.OpenCLGLVulkanCompatibilityPack
     - id: Microsoft.PowerShell
       required: true
+      priority: 10
       name: Microsoft.PowerShell
     - id: Microsoft.PowerToys
       required: true
@@ -300,9 +303,11 @@ winget:
       name: Microsoft.VisualStudio.Extensions.TypeScript
     - id: Microsoft.VisualStudioCode
       required: true
+      priority: 10
       name: Microsoft.VisualStudioCode
     - id: Microsoft.VisualStudioCode.Insiders
       required: true
+      priority: 10
       name: Microsoft.VisualStudioCode.Insiders
     - id: Microsoft.VSTOR
       required: true

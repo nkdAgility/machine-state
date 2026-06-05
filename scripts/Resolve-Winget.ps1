@@ -365,6 +365,21 @@ switch ($Stage) {
             return
         }
 
+        # Build a priority map from the merged state (lower number = install first, default 999)
+        $priorityMap = @{}
+        if (Test-Path -LiteralPath $Context.MergedStateJson) {
+            $mergedForPriority = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
+            foreach ($src in @("winget", "msstore")) {
+                foreach ($pkg in @(Get-SourcePackages -StateObject $mergedForPriority -SourceName $src)) {
+                    $pkgId  = Get-ObjectValue -Object $pkg -Name "id"
+                    $pkgPri = Get-ObjectValue -Object $pkg -Name "priority"
+                    if ($pkgId) {
+                        $priorityMap[[string]$pkgId] = if ($null -ne $pkgPri) { [int]$pkgPri } else { 999 }
+                    }
+                }
+            }
+        }
+
         # Diff desired vs installed so we only attempt packages that are actually missing
         $installedWinget = @()
         $installedMsstore = @()
@@ -374,8 +389,8 @@ switch ($Stage) {
             $installedMsstore = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages.PackageIdentifier })
         }
 
-        $missingWinget  = @($desiredWinget  | Where-Object { $installedWinget  -notcontains $_ } | Sort-Object)
-        $missingMsstore = @($desiredMsstore | Where-Object { $installedMsstore -notcontains $_ } | Sort-Object)
+        $missingWinget  = @($desiredWinget  | Where-Object { $installedWinget  -notcontains $_ } | Sort-Object { if ($priorityMap.ContainsKey($_)) { $priorityMap[$_] } else { 999 } }, { $_ })
+        $missingMsstore = @($desiredMsstore | Where-Object { $installedMsstore -notcontains $_ } | Sort-Object { if ($priorityMap.ContainsKey($_)) { $priorityMap[$_] } else { 999 } }, { $_ })
 
         $upgradesPath = Join-Path $Context.BuildPath "winget.upgrades.json"
         $upgradeableWinget = @()
