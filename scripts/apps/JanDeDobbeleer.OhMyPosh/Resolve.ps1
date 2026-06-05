@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "..\..\Setup-Engine.ps1")
 
-$configSource = Join-Path $PSScriptRoot "..\..\..\config\ohmyposh.nkdagility.json"
+$configSource = Join-Path $PSScriptRoot "..\..\..\state\config\JanDeDobbeleer.OhMyPosh\ohmyposh.nkdagility.json"
 $configDest   = Join-Path $env:USERPROFILE ".config\ohmyposh\nkdagility.omp.json"
 $profileInit  = "oh-my-posh init pwsh --config `"$configDest`" | Invoke-Expression"
 
