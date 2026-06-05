@@ -35,7 +35,7 @@ function Get-EnabledSettings {
     if ($enabledIds.Count -eq 0) { return $Catalog }
 
     return @($Catalog | Where-Object {
-        $id = $_.PSObject.Properties['Id'] ? $_.Id : $_.id
+        $id = if ($_ -is [System.Collections.IDictionary]) { $_['Id'] ?? $_['id'] } else { $_.PSObject.Properties['Id']?.Value ?? $_.PSObject.Properties['id']?.Value }
         $enabledIds -contains $id
     })
 }
