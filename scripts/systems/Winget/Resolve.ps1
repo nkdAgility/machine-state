@@ -193,7 +193,6 @@ switch ($Stage) {
 
         if ($PSCmdlet.ShouldProcess((Join-Path $Context.ExportPath "winget.export.json"), "Export Winget state")) {
             $unavailablePath = Join-Path $Context.ExportPath "winget.unavailable.json"
-            $licensePath     = Join-Path $Context.ExportPath "winget.license-required.json"
             $exportLogPath   = Join-Path $Context.LogsPath  "winget.export.log"
 
             # Committed path — written alongside the machine YAML so it is tracked in git
@@ -215,8 +214,7 @@ switch ($Stage) {
                 ($stdoutLines + $stderrLines) | Set-Content -LiteralPath $exportLogPath -Encoding UTF8
 
                 # Parse all output lines for structured warnings
-                $unavailable     = @()
-                $licenseRequired = @()
+                $unavailable = @()
 
                 foreach ($line in ($stdoutLines + $stderrLines)) {
                     if (-not $line) { continue }
@@ -226,12 +224,8 @@ switch ($Stage) {
                             reason = "not available from any source"
                         }
                     }
-                    elseif ($line -match "Exported package requires license agreement to install:\s*(.+)") {
-                        $licenseRequired += [ordered]@{
-                            name   = $Matches[1].Trim()
-                            reason = "requires license agreement"
-                        }
-                    }
+                    # license-required lines are intentionally ignored — --accept-package-agreements
+                    # covers install-time agreements; export-time redistribution licenses are not actionable.
                 }
 
                 # Save unavailable/sideloaded packages — both working/ (transient) and state/machines/ (committed)
@@ -245,14 +239,6 @@ switch ($Stage) {
                     if (Test-Path -LiteralPath $committedUnavailable) { Remove-Item -LiteralPath $committedUnavailable -Force }
                 }
 
-                # Save license-required packages — working/ only (not committed to git)
-                if ($licenseRequired.Count -gt 0) {
-                    $licenseRequired | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $licensePath -Encoding UTF8
-                    Write-Host "$($licenseRequired.Count) license-required package(s) noted (working/ only)"
-                }
-                elseif (Test-Path -LiteralPath $licensePath) {
-                    Remove-Item -LiteralPath $licensePath -Force
-                }
 
                 if ($exitCode -ne 0) {
                     throw "Winget export failed with exit code $exitCode. See log: $exportLogPath"
