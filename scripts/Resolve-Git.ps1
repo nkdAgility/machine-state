@@ -47,16 +47,45 @@ function Expand-StatePath {
     return [System.Environment]::ExpandEnvironmentVariables($Path)
 }
 
+function Get-SafeProperty {
+    param([object]$Object, [string]$Name)
+    if ($null -eq $Object) { return $null }
+    $prop = $Object.PSObject.Properties[$Name]
+    if ($prop) { return $prop.Value }
+    return $null
+}
+
+function Get-CloneRootFromMachineYaml {
+    # Read cloneRoot directly from the machine YAML - safe to call before merge runs
+    if (-not (Test-Path -LiteralPath $Context.MachineStatePath)) { return "" }
+    $raw = Get-Content -LiteralPath $Context.MachineStatePath -Raw
+    $machineYaml = $raw | ConvertFrom-Yaml
+    $gitNode = if ($machineYaml -is [System.Collections.IDictionary]) { $machineYaml['git'] } else { Get-SafeProperty $machineYaml 'git' }
+    if (-not $gitNode) { return "" }
+    $cloneRoot = if ($gitNode -is [System.Collections.IDictionary]) { $gitNode['cloneRoot'] } else { Get-SafeProperty $gitNode 'cloneRoot' }
+    if (-not $cloneRoot) { return "" }
+    return Expand-StatePath ([string]$cloneRoot)
+}
+
 function Get-MergedGitConfig {
-    if (-not (Test-Path -LiteralPath $Context.MergedStateJson)) {
-        throw "Merged state not found at '$($Context.MergedStateJson)'. Run merge first."
+    $repos = @()
+    $cloneRoot = ""
+
+    if (Test-Path -LiteralPath $Context.MergedStateJson) {
+        $mergedState = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
+        $gitNode = Get-SafeProperty $mergedState 'git'
+        if ($gitNode) {
+            $rawRoot = Get-SafeProperty $gitNode 'cloneRoot'
+            if ($rawRoot) { $cloneRoot = Expand-StatePath ([string]$rawRoot) }
+            $rawRepos = Get-SafeProperty $gitNode 'repos'
+            if ($rawRepos) { $repos = @($rawRepos) }
+        }
     }
 
-    $mergedState = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
-    $gitNode = $mergedState.git
-
-    $cloneRoot = if ($gitNode -and $gitNode.cloneRoot) { Expand-StatePath $gitNode.cloneRoot } else { "" }
-    $repos     = if ($gitNode -and $gitNode.repos)     { @($gitNode.repos) }                  else { @() }
+    # Fall back to machine YAML for cloneRoot if merge hasn't run yet
+    if (-not $cloneRoot) {
+        $cloneRoot = Get-CloneRootFromMachineYaml
+    }
 
     return [pscustomobject]@{ CloneRoot = $cloneRoot; Repos = $repos }
 }
