@@ -478,6 +478,40 @@ function Get-MachineContext {
     return $context
 }
 
+function Get-MachineContextReadOnly {
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResolvedMachineName,
+
+        [Parameter(Mandatory)]
+        [string]$MachineStatePath
+    )
+
+    $machineState = Read-YamlFile -Path $MachineStatePath
+    $workingPath = Join-Path $WorkingRoot $ResolvedMachineName
+
+    return [pscustomobject]@{
+        MachineName      = $ResolvedMachineName
+        Platform         = [string]$machineState.platform
+        Architecture     = [string]$machineState.architecture
+        RepositoryRoot   = $RepositoryRoot
+        MachineStatePath = $MachineStatePath
+        WorkingPath      = $workingPath
+        ExportPath       = Join-Path $workingPath "export"
+        MergePath        = Join-Path $workingPath "merge"
+        BuildPath        = Join-Path $workingPath "build"
+        LogsPath         = Join-Path $workingPath "logs"
+        MergedStateYaml  = Join-Path (Join-Path $workingPath "merge") "machine-state.merged.yaml"
+        MergedStateJson  = Join-Path (Join-Path $workingPath "merge") "machine-state.merged.json"
+        WingetImportPath = Join-Path (Join-Path $workingPath "build") "winget.import.json"
+        WingetExportPath = Join-Path (Join-Path $workingPath "export") "winget.export.json"
+        NodeImportPath   = Join-Path (Join-Path $workingPath "build") "node.npm.import.json"
+        NodeExportPath   = Join-Path (Join-Path $workingPath "export") "node.npm.export.json"
+        UvImportPath     = Join-Path (Join-Path $workingPath "build") "uv.tools.import.json"
+        UvExportPath     = Join-Path (Join-Path $workingPath "export") "uv.tools.export.json"
+    }
+}
+
 function Invoke-ResolverScript {
     param(
         [Parameter(Mandatory)]
@@ -1033,30 +1067,6 @@ function Invoke-StageValidate {
             throw "Duplicate package IDs remain after merge for machine '$machine'."
         }
 
-        $context = Get-MachineContext -ResolvedMachineName $machine -MachineStatePath $machinePath
-
-        Write-YamlFile -Path $context.MergedStateYaml -Value $mergedState
-        $mergedState | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $context.MergedStateJson -Encoding UTF8
-        foreach ($scriptName in @($machineState.scripts)) {
-            Invoke-ResolverScript -ScriptName $scriptName -Stage Build -Context $context
-        }
-
-        if (-not (Test-Path -LiteralPath $context.WingetImportPath)) {
-            throw "Winget import JSON missing for machine '$machine': $($context.WingetImportPath)"
-        }
-
-        $json = Get-Content -LiteralPath $context.WingetImportPath -Raw | ConvertFrom-Json
-        if (-not $json.Sources) {
-            throw "Winget import JSON for machine '$machine' does not contain 'Sources'."
-        }
-
-        foreach ($source in @($json.Sources)) {
-            foreach ($package in @($source.Packages)) {
-                if (-not $package.PackageIdentifier) {
-                    throw "Winget import JSON for machine '$machine' contains a package without PackageIdentifier."
-                }
-            }
-        }
     }
 
     Write-Host "Validation completed successfully for $($available.Count) machine(s)."
