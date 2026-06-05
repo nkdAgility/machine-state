@@ -195,10 +195,6 @@ switch ($Stage) {
             $unavailablePath = Join-Path $Context.ExportPath "winget.unavailable.json"
             $exportLogPath   = Join-Path $Context.LogsPath  "winget.export.log"
 
-            # Committed path — written alongside the machine YAML so it is tracked in git
-            $machineStateDir      = Split-Path -Parent $Context.MachineStatePath
-            $committedUnavailable = Join-Path $machineStateDir "$($Context.MachineName).winget-sideloaded.json"
-
             New-DirectoryIfMissing -Path $Context.LogsPath
 
             # Capture both stdout and stderr so nothing leaks to the console
@@ -228,15 +224,13 @@ switch ($Stage) {
                     # covers install-time agreements; export-time redistribution licenses are not actionable.
                 }
 
-                # Save unavailable/sideloaded packages — both working/ (transient) and state/machines/ (committed)
+                # Save unavailable/sideloaded packages to working/ for diagnostics only
                 if ($unavailable.Count -gt 0) {
                     $unavailable | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $unavailablePath -Encoding UTF8
-                    $unavailable | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $committedUnavailable -Encoding UTF8
-                    Write-Host "$($unavailable.Count) sideloaded/unavailable package(s) logged to $($Context.MachineName).winget-sideloaded.json"
+                    Write-Host "$($unavailable.Count) sideloaded/unavailable package(s) found (see winget.unavailable.json)"
                 }
-                else {
-                    if (Test-Path -LiteralPath $unavailablePath)     { Remove-Item -LiteralPath $unavailablePath     -Force }
-                    if (Test-Path -LiteralPath $committedUnavailable) { Remove-Item -LiteralPath $committedUnavailable -Force }
+                elseif (Test-Path -LiteralPath $unavailablePath) {
+                    Remove-Item -LiteralPath $unavailablePath -Force
                 }
 
 
