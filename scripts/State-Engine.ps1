@@ -392,32 +392,38 @@ function Merge-MachineState {
     $npmPackages     = @()
     $uvPackages      = @()
     $gitRepos        = @()
-    $setupWindows    = @()
-    $setupGit        = @()
+    $setupWindows      = @()
+    $setupGit          = @()
+    $dotnetToolPackages = @()
+    $psmodulePackages  = @()
 
     foreach ($relativePath in @($machineState.state)) {
         $resolvedSharedPath = Join-Path (Split-Path -Parent $MachineStatePath) $relativePath
         $sharedState = Read-YamlFile -Path $resolvedSharedPath
         $stateObjects += $sharedState
 
-        $wingetPackages  += @(Get-SourcePackages -StateObject $sharedState -SourceName "winget")
-        $msstorePackages += @(Get-SourcePackages -StateObject $sharedState -SourceName "msstore")
-        $npmPackages     += @(Get-SectionPackages -StateObject $sharedState -SectionName "node" -SourceName "npm")
-        $uvPackages      += @(Get-SectionPackages -StateObject $sharedState -SectionName "uv" -SourceName "uv")
-        $gitRepos        += @(Get-GitRepos -StateObject $sharedState)
-        $setupWindows    += @(Get-SetupTopicIds -StateObject $sharedState -Topic "windows")
-        $setupGit        += @(Get-SetupTopicIds -StateObject $sharedState -Topic "git")
+        $wingetPackages     += @(Get-SourcePackages -StateObject $sharedState -SourceName "winget")
+        $msstorePackages    += @(Get-SourcePackages -StateObject $sharedState -SourceName "msstore")
+        $npmPackages        += @(Get-SectionPackages -StateObject $sharedState -SectionName "node" -SourceName "npm")
+        $uvPackages         += @(Get-SectionPackages -StateObject $sharedState -SectionName "uv" -SourceName "uv")
+        $dotnetToolPackages += @(Get-SectionPackages -StateObject $sharedState -SectionName "dotnet" -SourceName "tools")
+        $psmodulePackages   += @(Get-SectionPackages -StateObject $sharedState -SectionName "psmodules" -SourceName "psgallery")
+        $gitRepos           += @(Get-GitRepos -StateObject $sharedState)
+        $setupWindows       += @(Get-SetupTopicIds -StateObject $sharedState -Topic "windows")
+        $setupGit           += @(Get-SetupTopicIds -StateObject $sharedState -Topic "git")
     }
 
     $stateObjects += $machineState
 
-    $wingetPackages  += @(Get-SourcePackages -StateObject $machineState -SourceName "winget")
-    $msstorePackages += @(Get-SourcePackages -StateObject $machineState -SourceName "msstore")
-    $npmPackages     += @(Get-SectionPackages -StateObject $machineState -SectionName "node" -SourceName "npm")
-    $uvPackages      += @(Get-SectionPackages -StateObject $machineState -SectionName "uv" -SourceName "uv")
-    $gitRepos        += @(Get-GitRepos -StateObject $machineState)
-    $setupWindows    += @(Get-SetupTopicIds -StateObject $machineState -Topic "windows")
-    $setupGit        += @(Get-SetupTopicIds -StateObject $machineState -Topic "git")
+    $wingetPackages     += @(Get-SourcePackages -StateObject $machineState -SourceName "winget")
+    $msstorePackages    += @(Get-SourcePackages -StateObject $machineState -SourceName "msstore")
+    $npmPackages        += @(Get-SectionPackages -StateObject $machineState -SectionName "node" -SourceName "npm")
+    $uvPackages         += @(Get-SectionPackages -StateObject $machineState -SectionName "uv" -SourceName "uv")
+    $dotnetToolPackages += @(Get-SectionPackages -StateObject $machineState -SectionName "dotnet" -SourceName "tools")
+    $psmodulePackages   += @(Get-SectionPackages -StateObject $machineState -SectionName "psmodules" -SourceName "psgallery")
+    $gitRepos           += @(Get-GitRepos -StateObject $machineState)
+    $setupWindows       += @(Get-SetupTopicIds -StateObject $machineState -Topic "windows")
+    $setupGit           += @(Get-SetupTopicIds -StateObject $machineState -Topic "git")
 
     # cloneRoot is machine-specific — read from machine YAML only
     $machineGitNode = Get-ObjectValue -Object $machineState -Name "git"
@@ -428,11 +434,13 @@ function Merge-MachineState {
     $npmExclusions = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "npm")
     $uvExclusions = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "uv")
 
-    $mergedWingetPackages = @(Merge-PackageSource -Packages $wingetPackages)
-    $mergedMsstorePackages = @(Merge-PackageSource -Packages $msstorePackages)
-    $mergedNpmPackages = @(Merge-PackageSource -Packages $npmPackages)
-    $mergedUvPackages = @(Merge-PackageSource -Packages $uvPackages)
-    $mergedGitRepos = @(Merge-GitRepos -Repos $gitRepos)
+    $mergedWingetPackages      = @(Merge-PackageSource -Packages $wingetPackages)
+    $mergedMsstorePackages     = @(Merge-PackageSource -Packages $msstorePackages)
+    $mergedNpmPackages         = @(Merge-PackageSource -Packages $npmPackages)
+    $mergedUvPackages          = @(Merge-PackageSource -Packages $uvPackages)
+    $mergedDotnetToolPackages  = @(Merge-PackageSource -Packages $dotnetToolPackages)
+    $mergedPsmodulePackages    = @(Merge-PackageSource -Packages $psmodulePackages)
+    $mergedGitRepos            = @(Merge-GitRepos -Repos $gitRepos)
 
     if ($wingetExclusions.Count -gt 0) {
         $mergedWingetPackages = @(
@@ -502,6 +510,16 @@ function Merge-MachineState {
         uv           = [ordered]@{
             packages = [ordered]@{
                 uv = $mergedUvPackages
+            }
+        }
+        dotnet       = [ordered]@{
+            packages = [ordered]@{
+                tools = $mergedDotnetToolPackages
+            }
+        }
+        psmodules    = [ordered]@{
+            packages = [ordered]@{
+                psgallery = $mergedPsmodulePackages
             }
         }
         git          = [ordered]@{

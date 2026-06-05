@@ -451,3 +451,28 @@ setup:
     - diff-tool-vscode
     - merge-tool-vscode
 
+dotnet:
+  packages:
+    tools:
+      - id: dotnet-ef
+        name: dotnet-ef
+        required: true
+      - id: dotnet-outdated-tool
+        name: dotnet-outdated-tool
+        required: true
+      - id: dotnet-format
+        name: dotnet-format
+        required: true
+
+psmodules:
+  packages:
+    psgallery:
+      - id: powershell-yaml
+        name: powershell-yaml
+        required: true
+      - id: Pester
+        name: Pester
+        required: true
+      - id: PSScriptAnalyzer
+        name: PSScriptAnalyzer
+        required: true

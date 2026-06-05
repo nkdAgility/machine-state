@@ -13,10 +13,14 @@ state:
 scripts:
   - Resolve-WindowsSetup.ps1
   - Resolve-Winget.ps1
+  - Resolve-DotNet.ps1
+  - Resolve-PSModule.ps1
   - Resolve-Node.ps1
   - Resolve-Uv.ps1
+  - apps\Git.Git\Resolve.ps1
   - Resolve-Git.ps1
   - Resolve-GitCleanup.ps1
+  - apps\Elgato.StreamDeck\Resolve.ps1
 
 exclusions:
   packages:
