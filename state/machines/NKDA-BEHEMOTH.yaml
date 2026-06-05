@@ -8,7 +8,7 @@ git:
 state:
   - ../win/windows-common.yaml
   - ../win/windows-x64.yaml
-  - ../apps/git-common.yaml
+  - ../common.yaml
 
 scripts:
   - Resolve-WindowsSetup.ps1
