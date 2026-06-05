@@ -1,3 +1,13 @@
+setup:
+  git:
+    - long-paths
+    - default-branch
+    - autocrlf
+    - pull-rebase
+    - editor-vscode
+    - diff-tool-vscode
+    - merge-tool-vscode
+
 dotnet:
   packages:
     tools:
