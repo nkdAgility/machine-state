@@ -245,15 +245,13 @@ switch ($Stage) {
                     if (Test-Path -LiteralPath $committedUnavailable) { Remove-Item -LiteralPath $committedUnavailable -Force }
                 }
 
-                # Save license-required packages — both working/ (transient) and state/machines/ (committed)
+                # Save license-required packages — working/ only (not committed to git)
                 if ($licenseRequired.Count -gt 0) {
                     $licenseRequired | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $licensePath -Encoding UTF8
-                    $licenseRequired | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $committedLicense -Encoding UTF8
-                    Write-Host "$($licenseRequired.Count) license-required package(s) logged to $($Context.MachineName).winget-license-required.json"
+                    Write-Host "$($licenseRequired.Count) license-required package(s) noted (working/ only)"
                 }
-                else {
-                    if (Test-Path -LiteralPath $licensePath)     { Remove-Item -LiteralPath $licensePath     -Force }
-                    if (Test-Path -LiteralPath $committedLicense) { Remove-Item -LiteralPath $committedLicense -Force }
+                elseif (Test-Path -LiteralPath $licensePath) {
+                    Remove-Item -LiteralPath $licensePath -Force
                 }
 
                 if ($exitCode -ne 0) {
