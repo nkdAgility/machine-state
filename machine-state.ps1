@@ -72,6 +72,18 @@ try {
             if (-not $ExportOnly) {
                 Invoke-StageIngest -Context $context -MachineState $machineState
             }
+            # Auto-commit any captured changes
+            $gitStatus = & git -C $context.RepositoryRoot status --porcelain 2>$null
+            if ($gitStatus) {
+                Write-Host ""
+                Write-Host "  [capture] Committing captured state changes..."
+                & git -C $context.RepositoryRoot add --all
+                $machineName = $env:COMPUTERNAME
+                & git -C $context.RepositoryRoot commit -m "capture: update state from $machineName"
+                Write-Host "  [capture] Committed."
+            } else {
+                Write-Host "  [capture] No changes to commit."
+            }
         }
         "apply" {
             Invoke-StageMerge -Context $context -MachineStateData $machineState
