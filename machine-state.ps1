@@ -8,6 +8,8 @@ param(
 
     [string]$MachineName,
 
+    [string[]]$Script,
+
     [switch]$ExportOnly,
 
     [switch]$BuildOnly,
@@ -47,6 +49,15 @@ try {
     $machineStatePath = Get-MachineStatePath -ResolvedMachineName $resolvedMachineName
     $machineState = Read-YamlFile -Path $machineStatePath
     $context = Get-MachineContext -ResolvedMachineName $resolvedMachineName -MachineStatePath $machineStatePath
+
+    # Filter to specific scripts if -Script was provided
+    if ($Script -and $Script.Count -gt 0) {
+        $machineState.scripts = @($machineState.scripts | Where-Object { $Script -contains $_ })
+        if ($machineState.scripts.Count -eq 0) {
+            throw "None of the specified script(s) '$($Script -join ', ')' are configured for machine '$resolvedMachineName'."
+        }
+        Write-Host "Running subset: $($machineState.scripts -join ', ')"
+    }
 
     switch ($Action) {
         "status" {
