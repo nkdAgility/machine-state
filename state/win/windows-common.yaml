@@ -137,6 +137,9 @@ winget:
     - required: true
       name: Krisp
       id: XP9D25XXG3SV5X
+    - required: true
+      name: Teleprompter Pro
+      id: 9WZDNCRFJSS3
     - name: TreeSize Free
       required: true
       id: XP9M26RSCLNT88
