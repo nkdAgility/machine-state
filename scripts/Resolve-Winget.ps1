@@ -150,36 +150,39 @@ switch ($Stage) {
 
         if ($PSCmdlet.ShouldProcess($Context.WingetExportPath, "Export Winget state")) {
             $unavailablePath = Join-Path $Context.ExportPath "winget.unavailable.json"
-            $licensePath = Join-Path $Context.ExportPath "winget.license-required.json"
+            $licensePath     = Join-Path $Context.ExportPath "winget.license-required.json"
+            $exportLogPath   = Join-Path $Context.LogsPath  "winget.export.log"
 
-            # Run winget export and capture stderr for unavailable/license warnings
+            New-DirectoryIfMissing -Path $Context.LogsPath
+
+            # Capture both stdout and stderr so nothing leaks to the console
+            $stdoutFile = [System.IO.Path]::GetTempFileName()
             $stderrFile = [System.IO.Path]::GetTempFileName()
             try {
-                & winget export --output $Context.WingetExportPath --accept-source-agreements 2>$stderrFile
+                & winget export --output $Context.WingetExportPath --accept-source-agreements 2>$stderrFile | Out-File -LiteralPath $stdoutFile -Encoding UTF8
                 $exitCode = $LASTEXITCODE
 
-                # Parse stderr for warnings
-                $unavailable = @()
+                # Merge stdout + stderr into a single log file
+                $stdoutLines = @(Get-Content -LiteralPath $stdoutFile -ErrorAction SilentlyContinue)
+                $stderrLines = @(Get-Content -LiteralPath $stderrFile -ErrorAction SilentlyContinue)
+                ($stdoutLines + $stderrLines) | Set-Content -LiteralPath $exportLogPath -Encoding UTF8
+
+                # Parse all output lines for structured warnings
+                $unavailable     = @()
                 $licenseRequired = @()
 
-                if (Test-Path -LiteralPath $stderrFile) {
-                    $stderrLines = Get-Content -LiteralPath $stderrFile -ErrorAction SilentlyContinue
-                    foreach ($line in $stderrLines) {
-                        if ($line -match "Installed package is not available from any source:\s*(.+)") {
-                            $unavailable += [ordered]@{
-                                name   = $Matches[1].Trim()
-                                reason = "not available from any source"
-                            }
+                foreach ($line in ($stdoutLines + $stderrLines)) {
+                    if (-not $line) { continue }
+                    if ($line -match "Installed package is not available from any source:\s*(.+)") {
+                        $unavailable += [ordered]@{
+                            name   = $Matches[1].Trim()
+                            reason = "not available from any source"
                         }
-                        elseif ($line -match "Exported package requires license agreement to install:\s*(.+)") {
-                            $licenseRequired += [ordered]@{
-                                name   = $Matches[1].Trim()
-                                reason = "requires license agreement"
-                            }
-                        }
-                        else {
-                            # Echo other warnings to console
-                            Write-Warning $line
+                    }
+                    elseif ($line -match "Exported package requires license agreement to install:\s*(.+)") {
+                        $licenseRequired += [ordered]@{
+                            name   = $Matches[1].Trim()
+                            reason = "requires license agreement"
                         }
                     }
                 }
@@ -187,7 +190,7 @@ switch ($Stage) {
                 # Save unavailable packages
                 if ($unavailable.Count -gt 0) {
                     $unavailable | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $unavailablePath -Encoding UTF8
-                    Write-Host "$($unavailable.Count) sideloaded/unavailable packages logged to winget.unavailable.json"
+                    Write-Host "$($unavailable.Count) sideloaded/unavailable package(s) logged to winget.unavailable.json"
                 }
                 elseif (Test-Path -LiteralPath $unavailablePath) {
                     Remove-Item -LiteralPath $unavailablePath -Force
@@ -196,20 +199,19 @@ switch ($Stage) {
                 # Save license-required packages
                 if ($licenseRequired.Count -gt 0) {
                     $licenseRequired | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $licensePath -Encoding UTF8
-                    Write-Host "$($licenseRequired.Count) license-required packages logged to winget.license-required.json"
+                    Write-Host "$($licenseRequired.Count) license-required package(s) logged to winget.license-required.json"
                 }
                 elseif (Test-Path -LiteralPath $licensePath) {
                     Remove-Item -LiteralPath $licensePath -Force
                 }
 
                 if ($exitCode -ne 0) {
-                    throw "Winget export failed with exit code $exitCode."
+                    throw "Winget export failed with exit code $exitCode. See log: $exportLogPath"
                 }
             }
             finally {
-                if (Test-Path -LiteralPath $stderrFile) {
-                    Remove-Item -LiteralPath $stderrFile -Force -ErrorAction SilentlyContinue
-                }
+                Remove-Item -LiteralPath $stdoutFile -Force -ErrorAction SilentlyContinue
+                Remove-Item -LiteralPath $stderrFile -Force -ErrorAction SilentlyContinue
             }
         }
     }
