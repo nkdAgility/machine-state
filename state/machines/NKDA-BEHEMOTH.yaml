@@ -12,6 +12,7 @@ state:
 
 scripts:
   - Resolve-WindowsSetup.ps1
+  - Resolve-GitSetup.ps1
   - Resolve-Winget.ps1
   - Resolve-Node.ps1
   - Resolve-Uv.ps1
