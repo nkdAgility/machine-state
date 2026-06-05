@@ -1,30 +1,28 @@
-Use this as the Copilot implementation spec.
-
-````markdown
 # Build Specification: machine-state
 
 ## Objective
 
-Create a PowerShell-first repository named `machine-state` for rebuilding, updating, exporting, and synchronising named workstations.
+`machine-state` is a PowerShell-first repository for rebuilding, updating, exporting, and synchronising named Windows workstations to a declared desired state.
 
-The system must be deterministic. YAML files describe desired machine state. PowerShell scripts perform all execution. LLMs may help maintain the repository, but must not be required to run it.
+YAML files describe desired machine state across five domains: winget packages, npm global packages, uv tools, git repository clones, and OS/tool configuration (setup). PowerShell scripts perform all execution. The same inputs always produce the same generated output. LLMs may help maintain the repository but are never required to run it.
 
-The first supported machines are:
+The system:
 
-- `NKDA-BEHEMOTH`, Windows x64, high-power desktop with Intel i9 and NVIDIA GPU.
-- `NKDA-ROCINANTE`, Windows ARM64, Snapdragon Surface with 64 GB RAM.
+1. Detects or accepts the current machine name.
+2. Loads the machine YAML file.
+3. Merges shared state YAML files with machine-specific state.
+4. Exports the current observed state of the machine.
+5. Builds tool-specific import manifests from merged desired state.
+6. Executes resolver scripts to converge the machine to desired state.
+7. Allows each stage to run independently for debugging.
+8. Supports a `capture` action that exports and ingests discovered packages back into shared YAML.
 
-The first supported package system is Winget.
+Supported machines:
 
-The system must be able to:
+- `NKDA-BEHEMOTH` — Windows x64, high-power desktop with Intel i9 and NVIDIA GPU.
+- `NKDA-ROCINANTE` — Windows ARM64, Snapdragon Surface with 64 GB RAM.
 
-1. Detect the current machine.
-2. Load the correct machine YAML file.
-3. Merge machine YAML with referenced shared state YAML files.
-4. Build a valid Winget import JSON file from the merged YAML.
-5. Export current Winget state.
-6. Execute configured resolver scripts in order.
-7. Allow each stage to be run independently for debugging.
+---
 
 ## Design Principles
 
@@ -33,19 +31,20 @@ The system must be able to:
 3. `machine-state.ps1` decides when.
 4. `working/` shows what happened.
 5. Generated files are not the source of truth.
-6. The same inputs should produce the same generated output.
+6. The same inputs must produce the same generated output.
 7. Scripts must be PowerShell 7+.
 8. No Bash.
 9. No hidden LLM dependency.
 10. Prefer deterministic scripts over inferred behaviour.
+11. Infrastructure errors throw and stop execution; package-level errors accumulate and are reported at the end.
+12. Merge always runs — even in WhatIf mode — so Execute can compute what would change.
+
+---
 
 ## Repository Structure
 
-Create this structure:
-
 ```text
 machine-state/
-  README.md
   machine-state.ps1
 
   state/
@@ -58,154 +57,162 @@ machine-state/
       windows-x64.yaml
       windows-arm64.yaml
 
+    apps/
+      git-common.yaml
+
   scripts/
+    State-Engine.ps1
+    Setup-Engine.ps1
+    Resolver-Common.ps1
     Resolve-Winget.ps1
+    Resolve-Node.ps1
+    Resolve-Uv.ps1
+    Resolve-Git.ps1
+    Resolve-GitCleanup.ps1
+    Resolve-WindowsSetup.ps1
+    apps/
+      Git.Git/
+      JanDeDobbeleer.OhMyPosh/
 
   working/
-    .gitkeep
+    <MachineName>/
+      export/
+      merge/
+      build/
+      logs/
 
   docs/
-    .gitkeep
+    spec.md
+
+  config/
 
   .gitignore
-````
-
-## Root Script
-
-Create `machine-state.ps1` in the repository root.
-
-It must support these stages:
-
-```powershell
-./machine-state.ps1 export
-./machine-state.ps1 merge
-./machine-state.ps1 build
-./machine-state.ps1 execute
-./machine-state.ps1 sync
 ```
 
-It must also support:
+`working/` is Git-ignored except for `.gitkeep`. `state/` and `scripts/` are committed. `config/` holds optional per-app configuration data (e.g., Stream Deck layouts).
+
+---
+
+## machine-state.ps1
+
+The entry point. Dot-sources `scripts/State-Engine.ps1` and orchestrates all stages.
+
+### Parameters
 
 ```powershell
-./machine-state.ps1 status
-./machine-state.ps1 validate
-```
-
-The default action should be `sync`.
-
-Example usage:
-
-```powershell
-./machine-state.ps1
-./machine-state.ps1 sync
-./machine-state.ps1 merge
-./machine-state.ps1 build
-./machine-state.ps1 execute
-./machine-state.ps1 export
-./machine-state.ps1 validate
-./machine-state.ps1 status
-./machine-state.ps1 sync -MachineName NKDA-BEHEMOTH
-./machine-state.ps1 sync -MachineName NKDA-ROCINANTE
-```
-
-## Parameters
-
-`machine-state.ps1` must support:
-
-```powershell
+[CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("export", "merge", "build", "execute", "sync", "status", "validate")]
+    [ValidateSet("capture", "apply", "sync", "status", "validate", "export", "merge", "build", "execute")]
     [string]$Action = "sync",
 
     [string]$MachineName,
+
+    [string[]]$Script,
+
+    [switch]$ExportOnly,
+
+    [switch]$BuildOnly,
 
     [switch]$VerboseOutput
 )
 ```
 
-Use `[CmdletBinding(SupportsShouldProcess)]`.
+`-WhatIf` is provided by PowerShell via `SupportsShouldProcess` and is not declared explicitly.
 
-`-WhatIf` is provided by PowerShell via `SupportsShouldProcess` and does not need to be declared explicitly in the `param(...)` block.
+### -Script Filter
 
-## Machine Detection
+If `-Script` is provided, only resolver scripts whose filename matches one of the supplied values are run for that invocation. If none of the supplied names match the machine's configured scripts, the command throws.
 
-On Windows, detect the current machine with:
+Example:
 
 ```powershell
-$env:COMPUTERNAME
+./machine-state.ps1 sync -Script Resolve-Git.ps1
 ```
 
-If `-MachineName` is supplied, use that instead.
+### -ExportOnly and -BuildOnly
 
-If the detected or supplied machine has a matching YAML file under:
+| Flag | Effect |
+|---|---|
+| `-ExportOnly` | In `sync`, skips merge/build/execute after export. In `capture`, skips ingest after export. |
+| `-BuildOnly` | In `sync` and `apply`, skips execute after build. |
 
-```text
-state/machines/<MachineName>.yaml
+### Actions
+
+| Action | Stages run |
+|---|---|
+| `sync` (default) | Export → Merge → Build → Execute (respects `-ExportOnly`, `-BuildOnly`) |
+| `capture` | Export → Ingest (writes new packages back into shared YAML; respects `-ExportOnly`) |
+| `apply` | Merge → Build → Execute (respects `-BuildOnly`) |
+| `status` | Prints machine info — no changes made |
+| `validate` | Structural checks only — no changes made |
+| `export` | Export only (legacy verb) |
+| `merge` | Merge only (legacy verb) |
+| `build` | Merge if needed, then Build (legacy verb) |
+| `execute` | Merge+Build if needed, then Execute (legacy verb) |
+
+### WhatIf Behaviour
+
+`-WhatIf` is passed through to all resolver scripts via `$WhatIfPreference`.
+
+- Merge always runs (forced off WhatIf) so Execute can read the merged state.
+- Export: file writes are skipped (ShouldProcess-gated).
+- Build: file writes are skipped (ShouldProcess-gated).
+- Execute: dry-run output shows what would be installed/changed without doing it.
+
+---
+
+## Context Object
+
+`Get-MachineContext` creates and returns this object. All working directories are created as a side-effect.
+
+```powershell
+[pscustomobject]@{
+    MachineName      = "NKDA-BEHEMOTH"
+    Platform         = "win"
+    Architecture     = "x64"
+    RepositoryRoot   = "<repo-root>"
+    MachineStatePath = "<repo-root>/state/machines/NKDA-BEHEMOTH.yaml"
+    WorkingPath      = "<repo-root>/working/NKDA-BEHEMOTH"
+    ExportPath       = "<repo-root>/working/NKDA-BEHEMOTH/export"
+    MergePath        = "<repo-root>/working/NKDA-BEHEMOTH/merge"
+    BuildPath        = "<repo-root>/working/NKDA-BEHEMOTH/build"
+    LogsPath         = "<repo-root>/working/NKDA-BEHEMOTH/logs"
+    MergedStateYaml  = "<repo-root>/working/NKDA-BEHEMOTH/merge/machine-state.merged.yaml"
+    MergedStateJson  = "<repo-root>/working/NKDA-BEHEMOTH/merge/machine-state.merged.json"
+}
 ```
 
-use that file.
+There are no resolver-specific path properties on the context. Each resolver derives its own file paths from `ExportPath`, `BuildPath`, and `LogsPath`.
 
-If the machine is unknown, print the available machine names and ask the user to choose one interactively.
+A read-only variant (`Get-MachineContextReadOnly`) exists for validate — it does not create directories and includes additional derived paths for status display only.
 
-Do not silently default to a machine.
+---
 
-## State Files
+## State File Shapes
 
-The system uses YAML state files.
-
-Use PowerShell’s `ConvertFrom-Yaml` and `ConvertTo-Yaml` if available. If not available, the script should detect this and install or require the `powershell-yaml` module.
-
-Preferred behaviour:
-
-1. Check whether `ConvertFrom-Yaml` is available.
-2. If not, check for the `powershell-yaml` module.
-3. If not installed, print a clear error explaining the prerequisite.
-4. Do not silently install modules unless explicitly implemented with confirmation.
-
-## Exclusions
-
-Exclusions define installed packages that should never become part of desired state.
-
-Exclusions may be declared in any referenced YAML file:
-
-* machine files under `state/machines/`
-* shared files under `state/win/`
-
-Shape:
-
-```yaml
-exclusions:
-  packages:
-    winget:
-      - Microsoft.DotNet.SDK.9
-    msstore:
-      - XP89DCGQ3K6VLD
-```
-
-Rules:
-
-1. During merge, exclusions from all loaded state files are combined and deduplicated.
-2. Excluded package IDs are removed from merged desired state, even if present in common or machine package lists.
-3. Raw `winget export` output is still written unchanged to `working/<MachineName>/export/winget.export.json`.
-4. When converting/export snapshots into maintained YAML state, excluded IDs must be filtered out and never reintroduced.
-5. Shared exclusions should live in shared YAML files (for example `state/win/windows-common.yaml`) to avoid duplication across machine files.
-
-## Machine YAML Shape
-
-Create `state/machines/NKDA-BEHEMOTH.yaml`:
+### Machine YAML
 
 ```yaml
 name: NKDA-BEHEMOTH
 platform: win
 architecture: x64
 
+git:
+  cloneRoot: "%USERPROFILE%\\source\\repos"
+
 state:
   - ../win/windows-common.yaml
   - ../win/windows-x64.yaml
+  - ../apps/git-common.yaml
 
 scripts:
+  - Resolve-WindowsSetup.ps1
   - Resolve-Winget.ps1
+  - Resolve-Node.ps1
+  - Resolve-Uv.ps1
+  - Resolve-Git.ps1
+  - Resolve-GitCleanup.ps1
 
 exclusions:
   packages:
@@ -216,432 +223,103 @@ winget:
   packages:
     winget:
       - id: Nvidia.CUDA
-        name: NVIDIA CUDA Toolkit
-        description: NVIDIA CUDA development toolkit.
+        name: Nvidia.CUDA
         required: true
-
-      - id: Nvidia.PhysX
-        name: NVIDIA PhysX
-        description: NVIDIA PhysX runtime.
-        required: true
-
-      - id: OBSProject.OBSStudio
-        name: OBS Studio
-        description: Video recording and streaming software.
-        required: true
-```
-
-Create `state/machines/NKDA-ROCINANTE.yaml`:
-
-```yaml
-name: NKDA-ROCINANTE
-platform: win
-architecture: arm64
-
-state:
-  - ../win/windows-common.yaml
-  - ../win/windows-arm64.yaml
-
-scripts:
-  - Resolve-Winget.ps1
-
-exclusions:
-  packages:
-    winget: []
     msstore: []
 
-winget:
-  packages:
-    winget: []
-    msstore: []
+setup:
+  windows:
+    - long-paths
+    - execution-policy
+  git:
+    - default-branch
+    - autocrlf
 ```
 
-## Shared Windows YAML Files
+Key fields:
 
-Create `state/win/windows-common.yaml`:
+- `name`, `platform`, `architecture` — required; used in context and validation.
+- `git.cloneRoot` — machine-specific root path for repository clones; supports `%ENVVAR%` expansion. Only read from the machine YAML (never from shared state).
+- `state` — ordered list of relative paths to shared state YAML files, resolved relative to the machine file's directory.
+- `scripts` — ordered list of resolver script filenames under `scripts/`.
+- `exclusions.packages.winget/msstore` — package IDs that must never appear in desired state, even if present in shared files.
+- `winget.packages.winget/msstore` — machine-specific package lists.
+- `setup.windows/git` — list of catalog entry IDs to apply for each setup topic.
+
+### Shared State YAML
+
+Shared files (e.g. `state/win/windows-common.yaml`, `state/apps/git-common.yaml`) may contain any combination of:
 
 ```yaml
-name: windows-common
-platform: win
-
 winget:
   packages:
     winget:
       - id: Git.Git
-        name: Git
-        description: Git version control system.
+        name: Git.Git
         required: true
-
-      - id: Microsoft.PowerShell
-        name: PowerShell
-        description: PowerShell 7 shell and scripting runtime.
-        required: true
-
-      - id: Microsoft.VisualStudioCode
+        priority: 10
+    msstore:
+      - id: XP9KHM4BK9FZ7Q
         name: Visual Studio Code
-        description: Code editor.
         required: true
 
-      - id: GitHub.cli
-        name: GitHub CLI
-        description: GitHub command-line interface.
+node:
+  packages:
+    npm:
+      - id: '@githubnext/github-copilot-cli'
+        name: '@githubnext/github-copilot-cli'
         required: true
 
-      - id: Microsoft.AzureCLI
-        name: Azure CLI
-        description: Command-line tools for Microsoft Azure.
+uv:
+  packages:
+    uv:
+      - id: specify-cli
+        name: specify-cli
         required: true
 
-      - id: Microsoft.WindowsTerminal
-        name: Windows Terminal
-        description: Modern terminal application for Windows.
-        required: true
+git:
+  repos:
+    - url: https://github.com/nkdAgility/machine-state
+    - url: https://github.com/nkdAgility/NKDAgility.com
+      folder: NKDAgility.com
 
-      - id: JanDeDobbeleer.OhMyPosh
-        name: Oh My Posh
-        description: Prompt theme engine.
-        required: true
-
-      - id: Microsoft.PowerToys
-        name: PowerToys
-        description: Microsoft PowerToys utilities.
-        required: true
-
-    msstore: []
-```
-
-Create `state/win/windows-x64.yaml`:
-
-```yaml
-name: windows-x64
-platform: win
-architecture: x64
-
-winget:
+exclusions:
   packages:
     winget:
-      - id: Microsoft.VisualStudio.Enterprise.Insiders
-        name: Visual Studio Enterprise Insiders
-        description: Visual Studio Enterprise Insiders edition.
-        required: true
-
-      - id: Microsoft.DotNet.SDK.10
-        name: .NET SDK 10
-        description: .NET 10 SDK.
-        required: true
-
-      - id: Microsoft.DotNet.SDK.9
-        name: .NET SDK 9
-        description: .NET 9 SDK.
-        required: true
-
-      - id: Microsoft.DotNet.SDK.8
-        name: .NET SDK 8
-        description: .NET 8 SDK.
-        required: true
-
+      - Microsoft.DotNet.SDK.9
     msstore: []
+
+setup:
+  windows:
+    - long-paths
+    - developer-mode
+  git:
+    - default-branch
+    - autocrlf
 ```
 
-Create `state/win/windows-arm64.yaml`:
+### Package Fields
 
-```yaml
-name: windows-arm64
-platform: win
-architecture: arm64
+| Field | Required | Notes |
+|---|---|---|
+| `id` | Yes | Package identifier. Used as the deduplication key. |
+| `name` | Yes | Human-readable label. Not emitted to install manifests. |
+| `required` | No | Informational flag. |
+| `priority` | No | Integer; lower values install first. Default 999. Only used by Resolve-Winget.ps1 Execute. |
+| `manual` | No | Boolean. If true, the package is excluded from the automated import manifest and printed as a manual-install reminder instead. |
 
-winget:
-  packages:
-    winget:
-      - id: Microsoft.DotNet.SDK.10
-        name: .NET SDK 10
-        description: .NET 10 SDK.
-        required: true
+Git repo fields:
 
-      - id: Microsoft.DotNet.SDK.9
-        name: .NET SDK 9
-        description: .NET 9 SDK.
-        required: true
+| Field | Required | Notes |
+|---|---|---|
+| `url` | Yes | Remote URL. Used as the deduplication key (normalised to lowercase, trailing `.git` and `/` stripped). |
+| `folder` | No | Override the local folder name. Defaults to the last path segment of the URL. |
 
-      - id: Microsoft.DotNet.SDK.8
-        name: .NET SDK 8
-        description: .NET 8 SDK.
-        required: true
+---
 
-    msstore: []
-```
+## Resolver Contract
 
-## Package YAML Shape
-
-Each Winget package entry must support:
-
-```yaml
-- id: Git.Git
-  name: Git
-  description: Git version control system.
-  required: true
-```
-
-Required fields:
-
-* `id`
-* `name`
-
-Optional fields:
-
-* `description`
-* `required`
-* `notes`
-* `tags`
-
-The generated Winget JSON must only use `id`, mapped to `PackageIdentifier`.
-
-## Working Folder
-
-All generated files must go under:
-
-```text
-working/<MachineName>/
-```
-
-For example:
-
-```text
-working/NKDA-BEHEMOTH/
-  export/
-    winget.export.json
-
-  merge/
-    machine-state.merged.yaml
-    machine-state.merged.json
-
-  build/
-    winget.import.json
-
-  logs/
-    machine-state.log
-```
-
-Create folders as needed.
-
-`working/` should be ignored by Git except for `.gitkeep`.
-
-## Stage: Export
-
-`export` reads current machine state and writes observed state to `working/<MachineName>/export/`.
-
-For Winget, call the Winget resolver script with stage `Export`.
-
-Expected output:
-
-```text
-working/<MachineName>/export/winget.export.json
-```
-
-Implementation should run:
-
-```powershell
-winget export --output <path> --accept-source-agreements
-```
-
-If Winget export fails, report the error clearly.
-
-## Stage: Merge
-
-`merge` loads:
-
-1. The machine YAML file.
-2. Each YAML file listed under the machine file’s `state` array.
-3. The machine file’s own inline state.
-
-Merge order:
-
-1. Referenced shared state files in listed order.
-2. Machine-specific inline state last.
-
-For `NKDA-BEHEMOTH`, merge:
-
-```text
-state/win/windows-common.yaml
-state/win/windows-x64.yaml
-state/machines/NKDA-BEHEMOTH.yaml
-```
-
-For `NKDA-ROCINANTE`, merge:
-
-```text
-state/win/windows-common.yaml
-state/win/windows-arm64.yaml
-state/machines/NKDA-ROCINANTE.yaml
-```
-
-Merge behaviour:
-
-1. Combine Winget package lists.
-2. Preserve separate sources:
-
-   * `winget`
-   * `msstore`
-3. Deduplicate by `id`.
-4. Sort packages by `id` for deterministic output.
-5. Preserve package metadata from the last occurrence if duplicates exist.
-6. Combine exclusions from all loaded state files (`state[]` files plus machine file), deduplicate exclusion IDs, and remove excluded package IDs from merged package lists.
-7. Save merged output as YAML and JSON.
-
-Expected output:
-
-```text
-working/<MachineName>/merge/machine-state.merged.yaml
-working/<MachineName>/merge/machine-state.merged.json
-```
-
-## Stage: Build
-
-`build` converts merged state into tool-specific generated files.
-
-For Winget, call `scripts/Resolve-Winget.ps1` with stage `Build`.
-
-Input:
-
-```text
-working/<MachineName>/merge/machine-state.merged.yaml
-```
-
-Output:
-
-```text
-working/<MachineName>/build/winget.import.json
-```
-
-The generated Winget JSON must follow this structure:
-
-```json
-{
-  "$schema": "https://aka.ms/winget-packages.schema.2.0.json",
-  "CreationDate": "2026-06-04T10:50:43.266-00:00",
-  "Sources": [
-    {
-      "Packages": [
-        {
-          "PackageIdentifier": "Git.Git"
-        }
-      ],
-      "SourceDetails": {
-        "Argument": "https://cdn.winget.microsoft.com/cache",
-        "Identifier": "Microsoft.Winget.Source_8wekyb3d8bbwe",
-        "Name": "winget",
-        "Type": "Microsoft.PreIndexed.Package"
-      }
-    },
-    {
-      "Packages": [
-        {
-          "PackageIdentifier": "9PLM9XGG6VKS"
-        }
-      ],
-      "SourceDetails": {
-        "Argument": "https://storeedgefd.dsx.mp.microsoft.com/v9.0",
-        "Identifier": "StoreEdgeFD",
-        "Name": "msstore",
-        "Type": "Microsoft.Rest"
-      }
-    }
-  ],
-  "WinGetVersion": "1.29.240"
-}
-```
-
-The source shape must preserve Winget’s separate `winget` and `msstore` sources. A real Winget export contains this structure, with `PackageIdentifier` entries grouped under `Sources[].Packages[]`. The uploaded export uses schema `https://aka.ms/winget-packages.schema.2.0.json`, includes `winget` and `msstore` sources, and was produced by Winget `1.29.240`. 
-
-For deterministic build output:
-
-1. Sort `winget` packages by `id`.
-2. Sort `msstore` packages by `id`.
-3. Do not include YAML-only metadata in the Winget JSON.
-4. Only emit `PackageIdentifier`.
-5. Include `CreationDate` only if required. If included, it makes exact file comparison non-deterministic, so prefer omitting it unless Winget requires it.
-6. Include `WinGetVersion` if available, but do not fail if it cannot be resolved.
-
-## Stage: Execute
-
-`execute` runs the resolver scripts listed in the machine YAML file.
-
-Example:
-
-```yaml
-scripts:
-  - Resolve-Winget.ps1
-```
-
-For each script:
-
-1. Resolve the script path under `scripts/`.
-2. Verify it exists.
-3. Call it with `-Stage Execute`.
-4. Pass a context object.
-5. Stop on failure unless explicitly changed later.
-
-For Winget, execute must run:
-
-```powershell
-winget import --import-file <working>/<MachineName>/build/winget.import.json --accept-package-agreements --accept-source-agreements
-```
-
-## Stage: Sync
-
-`sync` runs the full flow:
-
-```text
-export
-merge
-build
-execute
-```
-
-For rebuild scenarios, it should also be possible to skip export later, but the initial implementation can always run all four stages.
-
-## Stage: Status
-
-`status` prints:
-
-1. Detected machine name.
-2. Selected machine YAML.
-3. Platform.
-4. Architecture.
-5. Referenced state files.
-6. Scripts to run.
-7. Working folder path.
-
-Do not make changes during `status`.
-
-## Stage: Validate
-
-`validate` checks:
-
-1. Machine YAML files exist.
-2. Machine YAML has `name`, `platform`, and `architecture`.
-3. Referenced state YAML files exist.
-4. Script files listed in machine YAML exist.
-5. Winget package entries have `id` and `name`.
-6. Package IDs are unique after merge.
-7. Source names are valid:
-
-   * `winget`
-   * `msstore`
-8. Generated Winget JSON can be parsed.
-9. Generated Winget JSON has `Sources`.
-10. Generated Winget JSON has valid `PackageIdentifier` entries.
-11. Exclusion entries are non-empty IDs.
-12. Machine-local package IDs are unique across machine files (if duplicated across machines, move to shared state).
-13. Machine-local exclusion IDs are unique across machine files (if shared, move to shared state YAML).
-
-Do not execute installations during `validate`.
-
-## Resolver Script Contract
-
-Create `scripts/Resolve-Winget.ps1`.
-
-It must support:
+All resolver scripts follow this contract:
 
 ```powershell
 #Requires -Version 7.0
@@ -660,188 +338,452 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 ```
 
-The context object must include:
+Resolver scripts are invoked by `Invoke-ResolverScript` in `State-Engine.ps1`. Each invocation prints a stage/script banner:
 
-```powershell
-[pscustomobject]@{
-    MachineName        = "NKDA-BEHEMOTH"
-    Platform           = "win"
-    Architecture       = "x64"
-    RepositoryRoot     = "<repo-root>"
-    MachineStatePath   = "<repo-root>/state/machines/NKDA-BEHEMOTH.yaml"
-    WorkingPath        = "<repo-root>/working/NKDA-BEHEMOTH"
-    ExportPath         = "<repo-root>/working/NKDA-BEHEMOTH/export"
-    MergePath          = "<repo-root>/working/NKDA-BEHEMOTH/merge"
-    BuildPath          = "<repo-root>/working/NKDA-BEHEMOTH/build"
-    LogsPath           = "<repo-root>/working/NKDA-BEHEMOTH/logs"
-    MergedStateYaml    = "<repo-root>/working/NKDA-BEHEMOTH/merge/machine-state.merged.yaml"
-    MergedStateJson    = "<repo-root>/working/NKDA-BEHEMOTH/merge/machine-state.merged.json"
-    WingetImportPath   = "<repo-root>/working/NKDA-BEHEMOTH/build/winget.import.json"
-    WingetExportPath   = "<repo-root>/working/NKDA-BEHEMOTH/export/winget.export.json"
-}
+```text
+--- Build : Resolve-Winget.ps1 ---
 ```
 
-## Resolve-Winget.ps1 Behaviour
+Each resolver dot-sources either `Resolver-Common.ps1` (for package resolvers) or `Setup-Engine.ps1` (for setup resolvers), then implements a `switch ($Stage)` block for Export, Build, and Execute.
+
+The three-stage pattern:
+
+| Stage | Responsibility |
+|---|---|
+| **Export** | Read current observed state from the machine; write to `export/`. |
+| **Build** | Read `merge/machine-state.merged.json`; write tool-specific install manifests to `build/`. |
+| **Execute** | Read manifests from `build/`; converge the machine to desired state. |
+
+---
+
+## Resolver-Common.ps1
+
+Dot-sourced by all package resolver scripts (`Resolve-Winget.ps1`, `Resolve-Node.ps1`, `Resolve-Uv.ps1`, `Resolve-Git.ps1`).
+
+### Functions
+
+**`Get-ObjectValue -Object $obj -Name $name`**
+Safely reads a property from either a `[System.Collections.IDictionary]` (raw YAML parse) or a `[pscustomobject]` (JSON deserialise). Returns `$null` if not found.
+
+**`New-DirectoryIfMissing -Path $path`**
+Creates the directory if it does not exist. No-op if it does.
+
+**`Invoke-RefreshPath`**
+Rebuilds `$env:PATH` from the machine-level and user-level environment variables. Called after bootstrapping a tool via winget so the new binary is immediately available.
+
+**`Install-ToolIfMissing -Command $cmd -WingetId $id -DisplayName $name`**
+Checks whether `$cmd` is on PATH. If not, installs it via `winget install --id $id --accept-package-agreements --accept-source-agreements`, calls `Invoke-RefreshPath`, then verifies the command is now available. Throws on failure.
+
+**`Get-SectionPackages -StateObject $obj -SectionName $section -SourceName $source`**
+Navigates `$obj.$section.packages.$source` and returns the package array, or `@()` if any node is absent.
+
+---
+
+## Resolve-Winget.ps1
 
 ### Export
 
-Run:
-
-```powershell
-winget export --output $Context.WingetExportPath --accept-source-agreements
-```
-
-Create the export folder first.
+- Asserts winget is on PATH (`Assert-WingetAvailable`).
+- Runs `winget export --output <ExportPath>/winget.export.json --accept-source-agreements`.
+- Captures stdout and stderr to temp files; merges both into `logs/winget.export.log`.
+- Parses output lines for warnings:
+  - "Installed package is not available from any source" → written to `export/winget.unavailable.json`.
+  - "Exported package requires license agreement to install" → written to `export/winget.license-required.json`.
+- Stale warning files are deleted if the condition no longer applies.
+- Throws if winget exits non-zero.
 
 ### Build
 
-Read:
+- Reads `merge/machine-state.merged.json`.
+- Splits packages into **automated** (no `manual` field) and **manual** (`manual: true`).
+- Writes `build/winget.manual.json` listing manual packages (or deletes stale file).
+- Constructs the winget import model:
 
-```text
-$Context.MergedStateYaml
-```
+  ```json
+  {
+    "$schema": "https://aka.ms/winget-packages.schema.2.0.json",
+    "WinGetVersion": "<detected>",
+    "Sources": [
+      { "Packages": [...], "SourceDetails": { "Name": "winget", ... } },
+      { "Packages": [...], "SourceDetails": { "Name": "msstore", ... } }
+    ]
+  }
+  ```
 
-Build:
-
-```text
-$Context.WingetImportPath
-```
-
-The input YAML is:
-
-```yaml
-winget:
-  packages:
-    winget:
-      - id: Git.Git
-        name: Git
-        description: Git version control system.
-        required: true
-
-    msstore:
-      - id: 9PLM9XGG6VKS
-        name: Example Store App
-        description: Microsoft Store app.
-        required: true
-```
-
-The output JSON must map these to:
-
-```json
-{
-  "PackageIdentifier": "Git.Git"
-}
-```
+  Only automated packages appear in the import model. `WinGetVersion` is included if winget is available; omitted otherwise.
+- Writes `build/winget.import.json`.
+- Runs `winget upgrade --include-unknown` and parses the tabular output to detect upgradeable packages (filtered to desired automated packages only). Writes `build/winget.upgrades.json` (or deletes stale file).
 
 ### Execute
 
-Run:
+- WhatIf mode: diffs desired vs installed (from export) and reports what would be installed or upgraded. No changes made.
+- Live mode:
+  1. Builds a priority map from `merge/machine-state.merged.json` (`priority` field; default 999).
+  2. Diffs desired packages against `export/winget.export.json`; produces `$missingWinget` and `$missingMsstore` sorted by priority then id.
+  3. Reads `build/winget.upgrades.json` for packages to upgrade.
+  4. Builds a flat work list: installs first, upgrades second.
+  5. For each item: prints `[N/total]` progress, calls `winget install --id $id --source $source --accept-package-agreements --accept-source-agreements` or `winget upgrade --id $id --accept-package-agreements --accept-source-agreements`.
+  6. Accumulates failures; reports summary at the end. Failures do not abort remaining items.
+  7. Prints manual-install reminders for packages in `build/winget.manual.json`.
+
+---
+
+## Resolve-Node.ps1
+
+### Export
+
+- Bootstraps Node.js if absent (`Install-ToolIfMissing -Command npm -WingetId OpenJS.NodeJS.LTS`).
+- Runs `npm list -g --depth=0 --json`. Treats non-zero exit as empty list.
+- Writes `export/node.npm.export.json` with shape `{ packages: [{ id, version }] }`.
+
+### Build
+
+- Reads merged state; extracts `node.packages.npm` package IDs.
+- If npm is available, runs `npm outdated -g --json` and writes `build/node.upgrades.json` for desired packages with available upgrades.
+- Writes `build/node.npm.import.json` with shape:
+
+  ```json
+  { "packageManager": "npm", "installScope": "global", "packages": ["pkg-name"] }
+  ```
+
+### Execute
+
+- WhatIf mode: reports missing packages and available upgrades; no changes made.
+- Live mode: runs `npm install -g <pkg>` for every desired package in order. Accumulates failures; does not abort.
+
+---
+
+## Resolve-Uv.ps1
+
+### Export
+
+- Bootstraps uv if absent (`Install-ToolIfMissing -Command uv -WingetId astral-sh.uv`).
+- Tries `uv tool list --json`; falls back to plain-text `uv tool list` if JSON parse fails.
+- Writes `export/uv.tools.export.json` with shape `{ packageManager: "uv", packages: [{ id, version }] }`.
+
+### Build
+
+- Reads merged state; extracts `uv.packages.uv` package IDs.
+- Writes `build/uv.tools.import.json`:
+
+  ```json
+  { "packageManager": "uv", "installScope": "tool", "packages": ["tool-name"] }
+  ```
+
+### Execute
+
+- WhatIf mode: reports missing tools; no changes made.
+- Live mode: runs `uv tool install --upgrade --force <pkg>` for every desired tool. Accumulates failures.
+
+---
+
+## Resolve-Git.ps1
+
+### Export
+
+- Bootstraps git if absent (`Install-ToolIfMissing -Command git -WingetId Git.Git`).
+- Reads `cloneRoot` from merged state (or falls back to machine YAML if merge has not run yet; supports `%ENVVAR%` expansion).
+- Scans `cloneRoot` for directories containing a `.git` folder.
+- For each: reads `origin` remote URL and current branch.
+- Writes `export/git.export.json` with shape `{ cloneRoot, repos: [{ path, url, branch }] }`.
+
+### Build
+
+- Reads merged state for desired repos and `cloneRoot`.
+- Reads `export/git.export.json` for already-cloned repos.
+- Classifies each repo:
+  - **Managed** (in desired state and on disk): add to pull list.
+  - **To clone** (in desired state, not on disk): add to clone list.
+  - **Local-only** (on disk but not in desired state): add to pull list with `managed: false`.
+- Writes `build/git.ops.json`:
+
+  ```json
+  { "cloneRoot": "...", "clone": [...], "pull": [...] }
+  ```
+
+  Each item: `{ url, path, folder, managed }`.
+
+### Execute
+
+- WhatIf mode: processes ShouldProcess checks without running git commands.
+- Live mode:
+  1. Creates `cloneRoot` if missing.
+  2. Clones each entry in `ops.clone` via `git clone <url> <path>`.
+  3. Pulls each entry in `ops.pull` via `git -C <path> pull --ff-only`.
+  4. Accumulates failures; reports summary.
+
+URL normalisation: trailing `/` and `.git` are stripped; lowercased for deduplication. The original URL is used for the actual `git clone` call.
+
+---
+
+## Resolve-GitCleanup.ps1
+
+A supplementary resolver that prunes merged and redundant local branches across all repos under `cloneRoot`.
+
+### Export
+
+- Reads `cloneRoot` from `export/git.export.json` or merged state.
+- Fetches and prunes remotes (`git fetch --prune`) for each repo.
+- Counts branches eligible for auto-delete (merged into default branch, or no unique commits) and branches needing manual review (unique commits but no remote tracking branch).
+- Reports counts; writes no files.
+
+### Build
+
+No-op. No intermediate manifest needed.
+
+### Execute
+
+- For each repo under `cloneRoot`:
+  - Detects the default branch (`origin/HEAD`, then `origin/main`, then `origin/master`).
+  - Categorises local branches:
+    - **Auto-delete**: merged into default branch, or zero unique commits ahead of it.
+    - **Needs review**: unique commits but no remote tracking branch.
+    - **Keep**: unique commits and has a remote tracking branch.
+  - Checks out the default branch before deleting others.
+  - Deletes auto-delete branches via `git branch -d`.
+  - Reports branches needing review.
+- Writes `logs/git-cleanup-review.txt` if any branches need manual review.
+- Accumulates failures; does not abort.
+
+---
+
+## Setup Scripts
+
+Setup resolvers apply idempotent OS and tool configuration settings. They are built on `Setup-Engine.ps1` rather than `Resolver-Common.ps1`.
+
+### Setup-Engine.ps1
+
+Dot-sourced by setup resolver scripts. Provides `Invoke-SetupStage`.
+
+`Invoke-SetupStage -Stage $Stage -Context $Context -Topic $topic -Catalog $catalog`:
+
+1. Calls `Get-EnabledSettings` to filter the catalog to only IDs listed under `setup.$topic` in the merged state. If merged state is not yet available, the full catalog is used.
+2. Dispatches to the appropriate stage block.
+
+**Export**: Evaluates each enabled setting's `Check` scriptblock. Writes `export/<topic>.setup.json` with shape `[{ name, configured }]`. Reports how many settings need applying.
+
+**Build**: No-op. Settings are self-contained in the catalog.
+
+**Execute**:
+
+- Detects whether the current process is elevated (administrator).
+- For each setting:
+  - Runs `Check`. If already configured, prints `OK`.
+  - If `RequiresAdmin` is `true` and not elevated: prints `SKIPPED`; accumulates for post-run warning.
+  - Otherwise: runs `Apply`. Catches failures and accumulates them.
+- Prints summary: applied / already OK / skipped (need admin) / failed.
+- Warns if a reboot is required (WSL, Hyper-V, Virtual Machine Platform settings).
+
+Each catalog entry shape:
 
 ```powershell
-winget import --import-file $Context.WingetImportPath --accept-package-agreements --accept-source-agreements
+@{
+    Id            = "long-paths"
+    Name          = "Windows long paths (registry)"
+    RequiresAdmin = $true
+    Check         = { ... }    # scriptblock; returns truthy if already configured
+    Apply         = { ... }    # scriptblock; applies the change
+}
 ```
 
-If the import file does not exist, fail clearly and instruct the user to run `build`.
+### Resolve-WindowsSetup.ps1
 
-## README Content
+Topic: `windows`. Dot-sources `Setup-Engine.ps1`. Defines a catalog and calls `Invoke-SetupStage`.
 
-Create a `README.md` with:
+Catalog IDs:
 
-1. Purpose.
-2. Supported machines.
-3. How to run.
-4. Stage explanation.
-5. State file explanation.
-6. Winget flow explanation.
-7. Working folder explanation.
-8. Determinism principle.
-9. LLM boundary.
+| ID | Name | Admin Required |
+|---|---|---|
+| `long-paths` | Windows long paths (registry) | Yes |
+| `execution-policy` | PowerShell execution policy (RemoteSigned) | Yes |
+| `developer-mode` | Developer mode | Yes |
+| `show-file-extensions` | Show file extensions in Explorer | No |
+| `show-hidden-files` | Show hidden files in Explorer | No |
+| `show-protected-files` | Show protected OS files in Explorer | No |
+| `wsl` | WSL (Windows Subsystem for Linux) | Yes |
+| `virtual-machine-platform` | Virtual Machine Platform (WSL 2) | Yes |
+| `hyper-v` | Hyper-V | Yes |
+| `office-insider-beta` | Office Insider Beta channel (machine policy) | Yes |
+| `office-insider-behavior` | Office Insider slab behavior (user policy) | No |
 
-Include this short model:
+### Resolve-GitSetup (not yet implemented)
+
+A planned resolver for topic `git`. The catalog IDs referenced in shared state YAML (`long-paths`, `default-branch`, `autocrlf`, `pull-rebase`, `editor-vscode`, `diff-tool-vscode`, `merge-tool-vscode`) are prepared for this resolver. The script file does not yet exist.
+
+---
+
+## Merge Behaviour
+
+`Merge-MachineState` in `State-Engine.ps1` performs the full merge:
+
+1. Reads the machine YAML file.
+2. For each path in `machine.state[]` (resolved relative to the machine file's directory):
+   - Reads the shared YAML file.
+   - Accumulates packages, repos, exclusions, and setup IDs.
+3. Accumulates the machine file's own inline packages, repos, exclusions, and setup IDs.
+
+Merging rules per section:
+
+| Section | Key | Rule |
+|---|---|---|
+| `winget.packages.winget` | `id` | Deduplicate by id; last occurrence wins; sorted by id. |
+| `winget.packages.msstore` | `id` | Same. |
+| `node.packages.npm` | `id` | Same. |
+| `uv.packages.uv` | `id` | Same. |
+| `git.repos` | `url` (normalised) | Deduplicate by normalised URL; last occurrence wins; sorted by normalised URL. |
+| `setup.windows` | ID string | Deduplicated and sorted. |
+| `setup.git` | ID string | Deduplicated and sorted. |
+| `exclusions.packages.*` | ID string | Combined across all state objects; deduplicated and sorted. |
+| `git.cloneRoot` | — | Read from machine YAML only; never from shared files. |
+
+Exclusion application: after all packages are merged, any package whose `id` appears in the combined exclusion list for that source is removed from the merged package list.
+
+Output written to:
+
+- `working/<MachineName>/merge/machine-state.merged.yaml`
+- `working/<MachineName>/merge/machine-state.merged.json`
+
+---
+
+## Working Folder
+
+All generated files live under `working/<MachineName>/`. Folders are created on demand.
 
 ```text
-YAML says what.
-PowerShell says how.
-machine-state.ps1 decides when.
-working/ shows what happened.
+working/<MachineName>/
+  export/
+    winget.export.json          # raw winget export
+    winget.unavailable.json     # sideloaded/unavailable packages (if any)
+    winget.license-required.json # license-required packages (if any)
+    node.npm.export.json        # npm global packages
+    uv.tools.export.json        # uv tools
+    git.export.json             # discovered git repos
+    windows.setup.json          # windows setup check results
+    <topic>.setup.json          # setup check results per topic
+
+  merge/
+    machine-state.merged.yaml
+    machine-state.merged.json
+
+  build/
+    winget.import.json          # automated winget install manifest
+    winget.manual.json          # packages flagged manual: true
+    winget.upgrades.json        # detected upgrades (if any)
+    node.npm.import.json        # npm install manifest
+    node.upgrades.json          # detected npm upgrades (if any)
+    uv.tools.import.json        # uv install manifest
+    git.ops.json                # git clone/pull plan
+
+  logs/
+    winget.export.log           # stdout+stderr from winget export
+    git-cleanup-review.txt      # branches needing manual review (if any)
 ```
 
-## .gitignore
+---
 
-Create `.gitignore`:
+## Pipeline Logging
 
-```gitignore
-working/*
-!working/.gitkeep
+Stage banners are printed by `State-Engine.ps1`:
 
-*.log
-*.tmp
-
-# Secrets and credentials
-*.key
-*.pem
-*.pfx
-*.env
-secrets.*
-credentials.*
-id_rsa
-id_ed25519
+```text
+========================================
+  STAGE: Export  [NKDA-BEHEMOTH]
+========================================
 ```
 
-## Implementation Notes
-
-Use PowerShell 7+.
-
-Use strict mode:
-
-```powershell
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
+```text
+========================================
+  STAGE: Merge   [NKDA-BEHEMOTH]
+========================================
 ```
 
-Avoid Bash.
+```text
+========================================
+  STAGE: Build   [NKDA-BEHEMOTH]
+========================================
+```
 
-Avoid global mutable state where practical.
+```text
+========================================
+  STAGE: Execute [NKDA-BEHEMOTH]
+========================================
+```
 
-Keep functions small.
+Per-resolver announcements are printed by `Invoke-ResolverScript`:
 
-Prefer explicit paths.
+```text
+--- Export : Resolve-Winget.ps1 ---
+```
 
-Create missing folders before writing files.
+Within Execute, each package operation is logged as `[N/total] Installing <id>` or `[N/total] Upgrading <id>  <from> -> <to>`, followed by `[N/total] Done` or a warning on failure. A `Write-Progress` bar tracks completion percentage.
 
-Fail clearly when prerequisites are missing.
+---
+
+## Error Handling
+
+- **Infrastructure errors** (missing YAML file, missing resolver script, winget not found, failed bootstrap install) throw and propagate to the top-level `catch` in `machine-state.ps1`, which prints the error and exits with code 1.
+- **Package-level errors** (individual install/upgrade/clone failure) are accumulated into a `$failed` array. Execution continues with the remaining items. The summary line reports counts: `Completed: N/M succeeded, K failed: id1, id2`.
+- Setup settings that fail `Apply` are accumulated into `$failed` and reported in the summary. Settings that require admin when not elevated are accumulated into `$skipped` with a post-run reminder.
+
+---
+
+## WhatIf Behaviour
+
+`-WhatIf` is passed through the entire call chain via `$WhatIfPreference`.
+
+- **Merge**: always runs with WhatIf suppressed (`$WhatIfPreference = $false` inside `Invoke-StageMerge`). This ensures Execute can compute what would change.
+- **Export**: `ShouldProcess` gates file writes. Checks and reads still run.
+- **Build**: `ShouldProcess` gates all file writes (`winget.import.json`, `winget.manual.json`, `winget.upgrades.json`, `node.npm.import.json`, etc.).
+- **Execute (winget)**: diffs desired vs installed (from export); reports `Would install N package(s)` and `Would upgrade N package(s)` per source. No winget commands run.
+- **Execute (node/uv)**: same diff pattern.
+- **Execute (git)**: `ShouldProcess` is called per clone/pull operation; no git commands run.
+- **Execute (setup)**: setup check scriptblocks still run (read-only registry reads); Apply scriptblocks are gated by `ShouldProcess` inside each apply call.
+
+---
+
+## Validate
+
+`./machine-state.ps1 validate` runs `Invoke-StageValidate` from `State-Engine.ps1`. It is purely read-only and structural.
+
+Checks performed:
+
+1. At least one machine YAML file exists.
+2. Each machine YAML has `name`, `platform`, and `architecture`.
+3. Each path in `state[]` resolves to an existing file.
+4. Each script name in `scripts[]` resolves to an existing file under `scripts/`.
+5. Exclusion entries are non-empty strings.
+6. Machine-local package IDs are unique across all machine files (duplicates must move to shared state).
+7. Machine-local exclusion IDs are unique across all machine files.
+8. After merge, `winget.packages` only contains sources `winget` and `msstore`.
+9. All merged packages have `id` and `name`.
+10. Package IDs are globally unique across all sources within a single merged state.
+
+Validate does not run export, build, or execute, and does not write any files.
+
+---
 
 ## Acceptance Criteria
 
 The implementation is complete when:
 
-1. `./machine-state.ps1 status -MachineName NKDA-BEHEMOTH` shows the selected machine, state files, scripts, and working paths.
-2. `./machine-state.ps1 status -MachineName NKDA-ROCINANTE` shows the selected machine, state files, scripts, and working paths.
-3. `./machine-state.ps1 merge -MachineName NKDA-BEHEMOTH` writes merged YAML and JSON under `working/NKDA-BEHEMOTH/merge/`.
-4. `./machine-state.ps1 merge -MachineName NKDA-ROCINANTE` writes merged YAML and JSON under `working/NKDA-ROCINANTE/merge/`.
-5. `./machine-state.ps1 build -MachineName NKDA-BEHEMOTH` writes `working/NKDA-BEHEMOTH/build/winget.import.json`.
-6. `./machine-state.ps1 build -MachineName NKDA-ROCINANTE` writes `working/NKDA-ROCINANTE/build/winget.import.json`.
-7. The generated Winget JSON separates `winget` and `msstore` sources.
-8. The generated Winget JSON only includes `PackageIdentifier` package entries.
-9. Package metadata such as `name` and `description` remains in YAML but is not emitted into Winget JSON.
-10. Package IDs are deduplicated and sorted during merge/build.
-11. `./machine-state.ps1 export -MachineName NKDA-BEHEMOTH` runs Winget export and writes to `working/NKDA-BEHEMOTH/export/winget.export.json`.
-12. `./machine-state.ps1 execute -MachineName NKDA-BEHEMOTH` runs the scripts listed in `NKDA-BEHEMOTH.yaml`.
-13. `Resolve-Winget.ps1 -Stage Execute` runs Winget import using the generated import file.
-14. `./machine-state.ps1 validate` checks all machine and state files without installing anything.
-15. Unknown machines do not silently apply another machine’s config.
-16. All scripts are PowerShell 7+ compatible.
-17. No Bash scripts are created.
-18. The repository can run the stages independently for debugging:
-
-    * `export`
-    * `merge`
-    * `build`
-    * `execute`
-  19. Exclusions declared in shared or machine YAML files are applied during merge/build so excluded IDs do not appear in merged state or generated Winget import JSON.
-  20. Excluded packages may still appear in raw export artifacts, but are filtered out when generating or refreshing desired state YAML.
-
-```
-
-Confidence: High.
-```
+1. `./machine-state.ps1 status -MachineName NKDA-BEHEMOTH` shows machine name, YAML path, platform, architecture, referenced state files, scripts, and working path.
+2. `./machine-state.ps1 validate` passes for all configured machines without installing anything.
+3. `./machine-state.ps1 merge -MachineName NKDA-BEHEMOTH` writes `working/NKDA-BEHEMOTH/merge/machine-state.merged.yaml` and `.json`.
+4. The merged output combines packages from all referenced state files and the machine file; exclusions are applied; results are deduplicated and sorted.
+5. `./machine-state.ps1 build -MachineName NKDA-BEHEMOTH` writes `working/NKDA-BEHEMOTH/build/winget.import.json` separating `winget` and `msstore` sources with only `PackageIdentifier` entries.
+6. Packages marked `manual: true` do not appear in `winget.import.json` and are printed as reminders during Execute.
+7. Packages with a `priority` field are installed before lower-priority or default-priority packages.
+8. `./machine-state.ps1 export -MachineName NKDA-BEHEMOTH` writes observed state to `working/NKDA-BEHEMOTH/export/` for each configured resolver.
+9. `./machine-state.ps1 sync -MachineName NKDA-BEHEMOTH` runs all four stages in order.
+10. `./machine-state.ps1 sync -MachineName NKDA-BEHEMOTH -WhatIf` runs merge, then reports what would change without modifying the machine.
+11. `./machine-state.ps1 sync -Script Resolve-Git.ps1` runs only the git resolver.
+12. `./machine-state.ps1 capture -MachineName NKDA-BEHEMOTH` exports observed state and ingests newly discovered packages into the first shared YAML file.
+13. `./machine-state.ps1 apply -MachineName NKDA-BEHEMOTH -BuildOnly` runs merge and build without executing.
+14. Unknown machines do not silently apply another machine's configuration.
+15. All scripts are PowerShell 7+ compatible.
+16. No Bash scripts are present.
+17. Each stage can be run independently for debugging (`export`, `merge`, `build`, `execute`).
+18. Exclusions declared in shared or machine YAML files are applied at merge time so excluded IDs never appear in merged state or generated import manifests.
+19. Setup resolvers apply OS and tool configuration idempotently; already-configured settings are skipped; settings requiring elevation are skipped with a reminder when not running as administrator.
+20. Git resolver clones missing repos, pulls existing ones (managed and local-only), and never re-clones a repo whose path already exists on disk.
+21. Resolve-GitCleanup prunes merged and redundant local branches across all repos under `cloneRoot` and logs branches needing manual review.
