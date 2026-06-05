@@ -15,6 +15,46 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "Resolver-Common.ps1")
 
+function Invoke-AppResolver {
+    param(
+        [Parameter(Mandatory)]
+        [string]$PackageId,
+
+        [Parameter(Mandatory)]
+        [ValidateSet("Export", "Build", "Execute")]
+        [string]$ResolverStage,
+
+        [Parameter(Mandatory)]
+        [pscustomobject]$Context
+    )
+
+    $resolverPath = Join-Path $PSScriptRoot "apps\$PackageId\Resolve.ps1"
+    if (-not (Test-Path -LiteralPath $resolverPath)) { return }
+
+    Write-Host ""
+    Write-Host "--- $ResolverStage : apps\$PackageId\Resolve.ps1 ---" -ForegroundColor Cyan
+    & $resolverPath -Stage $ResolverStage -Context $Context -WhatIf:$WhatIfPreference
+}
+
+function Invoke-AllAppResolvers {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet("Export", "Build", "Execute")]
+        [string]$ResolverStage,
+
+        [Parameter(Mandatory)]
+        [pscustomobject]$Context
+    )
+
+    $appsRoot = Join-Path $PSScriptRoot "apps"
+    if (-not (Test-Path -LiteralPath $appsRoot)) { return }
+
+    foreach ($resolverFile in (Get-ChildItem -LiteralPath $appsRoot -Filter "Resolve.ps1" -Recurse)) {
+        $packageId = $resolverFile.Directory.Name
+        Invoke-AppResolver -PackageId $packageId -ResolverStage $ResolverStage -Context $Context
+    }
+}
+
 function Assert-WingetAvailable {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         throw "Winget was not found on PATH. Install Winget before running stage '$Stage'."
@@ -175,6 +215,8 @@ switch ($Stage) {
                 Remove-Item -LiteralPath $stderrFile -Force -ErrorAction SilentlyContinue
             }
         }
+
+        Invoke-AllAppResolvers -ResolverStage Export -Context $Context
     }
 
     "Build" {
@@ -276,6 +318,8 @@ switch ($Stage) {
                 Remove-Item -LiteralPath $upgradesPath -Force
             }
         }
+
+        Invoke-AllAppResolvers -ResolverStage Build -Context $Context
     }
 
     "Execute" {
@@ -408,6 +452,7 @@ switch ($Stage) {
                         }
                         else {
                             Write-Host "$tag Done"
+                            Invoke-AppResolver -PackageId $item.id -ResolverStage Execute -Context $Context
                         }
                     }
                 }
@@ -424,6 +469,7 @@ switch ($Stage) {
                         }
                         else {
                             Write-Host "$tag Done"
+                            Invoke-AppResolver -PackageId $item.id -ResolverStage Execute -Context $Context
                         }
                     }
                 }

@@ -429,10 +429,11 @@ function Merge-MachineState {
     $machineGitNode = Get-ObjectValue -Object $machineState -Name "git"
     $cloneRoot = if ($machineGitNode) { [string](Get-ObjectValue -Object $machineGitNode -Name "cloneRoot") } else { "" }
 
-    $wingetExclusions = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "winget")
-    $msstoreExclusions = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "msstore")
-    $npmExclusions = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "npm")
-    $uvExclusions = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "uv")
+    $wingetExclusions     = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "winget")
+    $msstoreExclusions    = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "msstore")
+    $npmExclusions        = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "npm")
+    $uvExclusions         = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "uv")
+    $psgalleryExclusions  = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "psgallery")
 
     $mergedWingetPackages      = @(Merge-PackageSource -Packages $wingetPackages)
     $mergedMsstorePackages     = @(Merge-PackageSource -Packages $msstorePackages)
@@ -482,6 +483,16 @@ function Merge-MachineState {
         )
     }
 
+    if ($psgalleryExclusions.Count -gt 0) {
+        $mergedPsmodulePackages = @(
+            $mergedPsmodulePackages |
+                Where-Object {
+                    $id = Get-ObjectValue -Object $_ -Name "id"
+                    $id -and ([string]$id -notin $psgalleryExclusions)
+                }
+        )
+    }
+
     $merged = [ordered]@{
         name         = [string]$machineState.name
         platform     = [string]$machineState.platform
@@ -490,10 +501,11 @@ function Merge-MachineState {
         scripts      = @($machineState.scripts)
         exclusions   = [ordered]@{
             packages = [ordered]@{
-                winget  = $wingetExclusions
-                msstore = $msstoreExclusions
-                npm     = $npmExclusions
-                uv      = $uvExclusions
+                winget     = $wingetExclusions
+                msstore    = $msstoreExclusions
+                npm        = $npmExclusions
+                uv         = $uvExclusions
+                psgallery  = $psgalleryExclusions
             }
         }
         winget       = [ordered]@{
@@ -1110,6 +1122,7 @@ function Invoke-StageValidate {
         Test-ExclusionShape -ExclusionIds @(Get-ExclusionIds -StateObject $machineState -SourceName "msstore") -SourceName "msstore" -Machine $machine
         Test-ExclusionShape -ExclusionIds @(Get-ExclusionIds -StateObject $machineState -SourceName "npm") -SourceName "npm" -Machine $machine
         Test-ExclusionShape -ExclusionIds @(Get-ExclusionIds -StateObject $machineState -SourceName "uv") -SourceName "uv" -Machine $machine
+        Test-ExclusionShape -ExclusionIds @(Get-ExclusionIds -StateObject $machineState -SourceName "psgallery") -SourceName "psgallery" -Machine $machine
 
         foreach ($id in @(Get-ExclusionIds -StateObject $machineState -SourceName "winget")) {
             if ($seenMachineExclusionWinget.ContainsKey($id)) {
@@ -1149,6 +1162,7 @@ function Invoke-StageValidate {
             Test-ExclusionShape -ExclusionIds @(Get-ExclusionIds -StateObject $sharedState -SourceName "msstore") -SourceName "msstore" -Machine $machine
             Test-ExclusionShape -ExclusionIds @(Get-ExclusionIds -StateObject $sharedState -SourceName "npm") -SourceName "npm" -Machine $machine
             Test-ExclusionShape -ExclusionIds @(Get-ExclusionIds -StateObject $sharedState -SourceName "uv") -SourceName "uv" -Machine $machine
+            Test-ExclusionShape -ExclusionIds @(Get-ExclusionIds -StateObject $sharedState -SourceName "psgallery") -SourceName "psgallery" -Machine $machine
         }
 
         $mergedState = Merge-MachineState -MachineStatePath $machinePath

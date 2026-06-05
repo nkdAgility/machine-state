@@ -58,10 +58,12 @@ switch ($Stage) {
 
         $importPath   = Join-Path $Context.BuildPath "dotnet.tools.import.json"
         $mergedState  = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
-        $dotnetNode   = $mergedState.PSObject.Properties['dotnet']?.Value
-        $packagesNode = $dotnetNode?.PSObject.Properties['packages']?.Value
-        $toolsNode    = $packagesNode?.PSObject.Properties['tools']?.Value
-        $desired      = if ($toolsNode) { @($toolsNode) } else { @() }
+        $dotnetProp   = $mergedState.PSObject.Properties['dotnet']
+        $dotnetVal    = if ($dotnetProp) { $dotnetProp.Value } else { $null }
+        $pkgProp      = if ($dotnetVal) { $dotnetVal.PSObject.Properties['packages'] } else { $null }
+        $pkgVal       = if ($pkgProp) { $pkgProp.Value } else { $null }
+        $toolsProp    = if ($pkgVal) { $pkgVal.PSObject.Properties['tools'] } else { $null }
+        $desired      = if ($toolsProp) { @($toolsProp.Value) } else { @() }
 
         $names = @($desired | ForEach-Object {
             $id = if ($_ -is [string]) { $_ } else { $_.PSObject.Properties['id']?.Value ?? $_['id'] }

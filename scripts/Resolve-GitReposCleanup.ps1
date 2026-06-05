@@ -40,7 +40,7 @@ function Get-DefaultBranch {
         Select-String "origin/master" |
         ForEach-Object { $_.ToString().Trim() -replace "origin/", "" } |
         Select-Object -First 1
-    return if ($branch) { [string]$branch } else { $null }
+    return ($branch ? [string]$branch : $null)
 }
 
 function Get-BranchesToClean {

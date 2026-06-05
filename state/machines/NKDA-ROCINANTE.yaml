@@ -11,8 +11,6 @@ scripts:
   - Resolve-Winget.ps1
   - Resolve-Node.ps1
   - Resolve-Uv.ps1
-  - apps\Git.Git\Resolve.ps1
-  - apps\Elgato.StreamDeck\Resolve.ps1
 
 exclusions:
   packages:

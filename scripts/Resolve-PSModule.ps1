@@ -56,10 +56,12 @@ switch ($Stage) {
         $importPath  = Join-Path $Context.BuildPath "psmodules.import.json"
         $mergedState = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
 
-        $psNode       = $mergedState.PSObject.Properties['psmodules']?.Value
-        $packagesNode = $psNode?.PSObject.Properties['packages']?.Value
-        $galleryNode  = $packagesNode?.PSObject.Properties['psgallery']?.Value
-        $desired      = if ($galleryNode) { @($galleryNode) } else { @() }
+        $psProp       = $mergedState.PSObject.Properties['psmodules']
+        $psVal        = if ($psProp) { $psProp.Value } else { $null }
+        $pkgProp      = if ($psVal) { $psVal.PSObject.Properties['packages'] } else { $null }
+        $pkgVal       = if ($pkgProp) { $pkgProp.Value } else { $null }
+        $galleryProp  = if ($pkgVal) { $pkgVal.PSObject.Properties['psgallery'] } else { $null }
+        $desired      = if ($galleryProp) { @($galleryProp.Value) } else { @() }
 
         $names = @($desired | ForEach-Object {
             $id = if ($_ -is [string]) { $_ } else { $_.PSObject.Properties['id']?.Value ?? $_['id'] }

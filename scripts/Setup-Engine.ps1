@@ -48,7 +48,7 @@ function Invoke-SetupStage {
         [Parameter(Mandatory)][array]$Catalog
     )
 
-    $Settings = Get-EnabledSettings -Context $Context -Topic $Topic -Catalog $Catalog
+    $Settings = @(Get-EnabledSettings -Context $Context -Topic $Topic -Catalog $Catalog)
 
     $exportPath = Join-Path $Context.ExportPath "$Topic.setup.json"
 

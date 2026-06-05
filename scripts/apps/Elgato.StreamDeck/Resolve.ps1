@@ -46,53 +46,25 @@ switch ($Stage) {
     }
 
     "Execute" {
-        Write-Host "  [stream-deck] Execute: restoring Stream Deck profiles..."
+        # Stream Deck does not expose a CLI for profile import. Copying files
+        # directly into ProfilesV2 bypasses the internal registry, so profiles
+        # will not appear in the UI. The backup must be imported via the app.
+        Write-Warning "  [stream-deck] *** MANUAL ACTION REQUIRED ***"
+        Write-Warning "  [stream-deck] Stream Deck profiles cannot be restored automatically."
+        Write-Warning "  [stream-deck] You must import the backup through the Stream Deck application:"
+        Write-Warning "  [stream-deck]   1. Open Stream Deck"
+        Write-Warning "  [stream-deck]   2. Go to Settings > Profiles"
+        Write-Warning "  [stream-deck]   3. Click the down arrow > Import from backup..."
+        Write-Warning "  [stream-deck]   4. Select: $BackupSourcePath"
 
         if (-not (Test-Path $BackupSourcePath)) {
-            throw "Stream Deck backup not found at '$BackupSourcePath'. Run export first to generate it."
+            Write-Warning "  [stream-deck] Backup file not found at '$BackupSourcePath' - run Export first."
+            return
         }
 
-        # The .streamDeckProfilesBackup file is a ZIP archive.
-        # Extract into ProfilesV2, merging with any existing profiles.
-        New-DirectoryIfMissing -Path $StreamDeckAppData
-
-        $tempExtract = Join-Path $env:TEMP "stream-deck-restore-$(Get-Random)"
-        try {
-            Expand-Archive -Path $BackupSourcePath -DestinationPath $tempExtract -Force
-
-            $profiles = Get-ChildItem -Path $tempExtract -Filter "*.sdProfile" -ErrorAction SilentlyContinue
-            if (-not $profiles) {
-                # Backup may contain the profiles directly or in a sub-folder
-                $profiles = Get-ChildItem -Path $tempExtract -Recurse -Filter "*.sdProfile" -ErrorAction SilentlyContinue
-            }
-
-            if ($profiles) {
-                foreach ($profile in $profiles) {
-                    $dest = Join-Path $StreamDeckAppData $profile.Name
-                    if ($PSCmdlet.ShouldProcess($dest, "Restore Stream Deck profile")) {
-                        Copy-Item -Path $profile.FullName -Destination $dest -Recurse -Force
-                        Write-Host "  [stream-deck] Restored profile: $($profile.Name)"
-                    }
-                }
-            }
-            else {
-                # No .sdProfile entries found - copy everything from the archive root
-                $items = Get-ChildItem -Path $tempExtract
-                foreach ($item in $items) {
-                    $dest = Join-Path $StreamDeckAppData $item.Name
-                    if ($PSCmdlet.ShouldProcess($dest, "Restore Stream Deck item")) {
-                        Copy-Item -Path $item.FullName -Destination $dest -Recurse -Force
-                        Write-Host "  [stream-deck] Restored: $($item.Name)"
-                    }
-                }
-            }
-
-            Write-Host "  [stream-deck] Profile restore complete. Restart the Stream Deck application to apply."
-        }
-        finally {
-            if (Test-Path $tempExtract) {
-                Remove-Item $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
-            }
+        # Open Explorer to the backup file so it is easy to locate.
+        if ($PSCmdlet.ShouldProcess($BackupSourcePath, "Open backup location in Explorer")) {
+            Start-Process explorer.exe -ArgumentList "/select,`"$BackupSourcePath`""
         }
     }
 }
