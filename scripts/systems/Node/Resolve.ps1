@@ -188,6 +188,7 @@ switch ($Stage) {
                     $failed += $pkg
                 }
                 else {
+                    Invoke-RefreshPath
                     Write-Host "$tag Done"
                 }
             }

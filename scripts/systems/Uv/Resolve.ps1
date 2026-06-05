@@ -97,6 +97,39 @@ switch ($Stage) {
         if ($PSCmdlet.ShouldProcess((Join-Path $Context.BuildPath "uv.tools.import.json"), "Write uv tool import manifest")) {
             $importModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Context.BuildPath "uv.tools.import.json") -Encoding UTF8
         }
+
+        # Detect upgrades: compare installed versions against PyPI latest
+        $upgradesPath = Join-Path $Context.BuildPath "uv.upgrades.json"
+        $upgrades = @()
+
+        $installedTools = @()
+        $rawJson = & uv tool list --json 2>$null
+        if ($LASTEXITCODE -eq 0 -and $rawJson) {
+            try { $installedTools = @($rawJson | ConvertFrom-Json) } catch { }
+        }
+
+        foreach ($name in $names) {
+            $installed = $installedTools | Where-Object { $_.name -eq $name }
+            if (-not $installed) { continue }
+            try {
+                $pypiData = Invoke-RestMethod -Uri "https://pypi.org/pypi/$name/json" -ErrorAction Stop
+                $latest = $pypiData.info.version
+                if ($latest -and $latest -ne $installed.version) {
+                    $upgrades += [ordered]@{ id = $name; installed = $installed.version; available = $latest }
+                }
+            } catch { }
+        }
+
+        if ($upgrades.Count -gt 0) {
+            if ($PSCmdlet.ShouldProcess($upgradesPath, "Write uv upgrades manifest")) {
+                $upgrades | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
+            }
+            Write-Host "$($upgrades.Count) uv tool(s) have upgrades available"
+        } elseif (Test-Path -LiteralPath $upgradesPath) {
+            if ($PSCmdlet.ShouldProcess($upgradesPath, "Remove stale uv upgrades manifest")) {
+                Remove-Item -LiteralPath $upgradesPath -Force
+            }
+        }
     }
 
     "Execute" {
@@ -132,15 +165,34 @@ switch ($Stage) {
             return
         }
 
-        $total   = $desiredPkgs.Count
+        # Live check: only install tools not already present
+        Write-Host "Querying installed uv tools..."
+        $installedIds = @()
+        $rawJson = & uv tool list --json 2>$null
+        if ($LASTEXITCODE -eq 0 -and $rawJson) {
+            try {
+                $installedIds = @(($rawJson | ConvertFrom-Json) | ForEach-Object { [string]$_.name } | Where-Object { $_ })
+            } catch {
+                $rawText = & uv tool list 2>$null
+                $installedIds = @($rawText -split "`r?`n" | Where-Object { $_ -and $_ -notmatch '^\s*-' } | ForEach-Object { ($_ -split '\s+')[0] } | Where-Object { $_ -and $_ -notmatch '^(tool|name)$' })
+            }
+        }
+
+        $pkgsToInstall = @($desiredPkgs | Where-Object { $installedIds -notcontains $_ })
+        $total   = $pkgsToInstall.Count
         $current = 0
         $failed  = @()
+
+        if ($total -eq 0) {
+            Write-Host "All uv tools are already installed"
+        }
+        else {
 
         Write-Host ""
         Write-Host "==> $total uv tool(s) to install/upgrade"
         Write-Host ""
 
-        foreach ($pkg in $desiredPkgs) {
+        foreach ($pkg in $pkgsToInstall) {
             $current++
             $tag = "[$current/$total]"
             $pct = [int](($current - 1) / $total * 100)
@@ -155,6 +207,7 @@ switch ($Stage) {
                     $failed += $pkg
                 }
                 else {
+                    Invoke-RefreshPath
                     Write-Host "$tag Done"
                 }
             }
@@ -170,5 +223,7 @@ switch ($Stage) {
         if ($failed.Count -gt 0) {
             Write-Warning "uv: $($failed.Count) tool(s) failed to install: $($failed -join ', ')"
         }
+
+        } # end else ($total -gt 0)
     }
 }

@@ -47,6 +47,70 @@ function Invoke-RefreshPath {
                 [System.Environment]::GetEnvironmentVariable("PATH", "User")
 }
 
+function Add-ManualAction {
+    param(
+        [Parameter(Mandatory)]
+        [pscustomobject]$Context,
+
+        [Parameter(Mandatory)]
+        [string]$Category,
+
+        [Parameter(Mandatory)]
+        [string]$Description,
+
+        [string]$Command,
+        [string]$Reason
+    )
+
+    $path = Join-Path $Context.BuildPath "manual-actions.json"
+    $actions = @()
+    if (Test-Path -LiteralPath $path) {
+        $actions = @(Get-Content -LiteralPath $path -Raw | ConvertFrom-Json)
+    }
+
+    $entry = [ordered]@{ category = $Category; description = $Description }
+    if ($Command) { $entry.command = $Command }
+    if ($Reason)  { $entry.reason  = $Reason  }
+
+    $actions += [pscustomobject]$entry
+    $actions | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $path -Encoding UTF8
+}
+
+function Write-ManualSummary {
+    param(
+        [Parameter(Mandatory)]
+        [pscustomobject]$Context
+    )
+
+    $path = Join-Path $Context.BuildPath "manual-actions.json"
+    if (-not (Test-Path -LiteralPath $path)) { return }
+
+    $actions = @(Get-Content -LiteralPath $path -Raw | ConvertFrom-Json)
+    if ($actions.Count -eq 0) { return }
+
+    $grouped = $actions | Group-Object category
+
+    Write-Host ""
+    Write-Host "╔══════════════════════════════════════════════════════╗" -ForegroundColor Yellow
+    Write-Host "║         MANUAL ACTIONS REQUIRED ($($actions.Count))                 ║" -ForegroundColor Yellow
+    Write-Host "╚══════════════════════════════════════════════════════╝" -ForegroundColor Yellow
+
+    foreach ($group in $grouped | Sort-Object Name) {
+        Write-Host ""
+        Write-Host "  [$($group.Name.ToUpper())]" -ForegroundColor Cyan
+        foreach ($item in $group.Group) {
+            Write-Host "  • $($item.description)"
+            if ($item.command) {
+                Write-Host "      $($item.command)" -ForegroundColor DarkGray
+            }
+            if ($item.reason) {
+                Write-Host "      Reason: $($item.reason)" -ForegroundColor DarkGray
+            }
+        }
+    }
+    Write-Host ""
+}
+
 function Install-ToolIfMissing {
     param(
         [Parameter(Mandatory)]

@@ -83,6 +83,9 @@ function Invoke-SetupStage {
         "Execute" {
             $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
+            # Load Add-ManualAction if not already available (dot-sourced via Resolver-Common)
+            $addManualFn = Get-Command Add-ManualAction -ErrorAction SilentlyContinue
+
             $applied = @()
             $skipped = @()
             $failed  = @()
@@ -108,6 +111,9 @@ function Invoke-SetupStage {
                 if ($setting.RequiresAdmin -and -not $isAdmin) {
                     Write-Warning "$tag SKIPPED  $($setting.Name) (requires admin)"
                     $skipped += $setting.Name
+                    if ($addManualFn) {
+                        Add-ManualAction -Context $Context -Category "$Topic-setup" -Description "$($setting.Name)" -Command "Re-run machine-state.ps1 as administrator" -Reason "requires elevation"
+                    }
                     continue
                 }
 
@@ -117,6 +123,10 @@ function Invoke-SetupStage {
                     & $setting.Apply
                     Write-Host "$tag Done"
                     $applied += $setting.Name
+                    # Fire optional OnApplied callback (e.g. to register reboot-required actions)
+                    if ($setting.OnApplied -and $addManualFn) {
+                        & $setting.OnApplied
+                    }
                 }
                 catch {
                     Write-Warning "$tag FAILED   $($setting.Name): $_"
@@ -127,18 +137,6 @@ function Invoke-SetupStage {
             $alreadyOk = $total - $applied.Count - $skipped.Count - $failed.Count
             Write-Host ""
             Write-Host "==> $Topic setup: $($applied.Count) applied, $alreadyOk already OK$(if ($skipped.Count -gt 0) { ", $($skipped.Count) skipped (need admin)" })$(if ($failed.Count -gt 0) { ", $($failed.Count) failed" })"
-
-            if ($skipped.Count -gt 0) {
-                Write-Host ""
-                Write-Warning "Re-run as administrator to apply:"
-                foreach ($s in $skipped) { Write-Host "  - $s" }
-            }
-
-            $rebootNeeded = @($applied | Where-Object { $_ -match "WSL|Hyper-V|Virtual Machine" })
-            if ($rebootNeeded.Count -gt 0) {
-                Write-Host ""
-                Write-Warning "Reboot required to complete: $($rebootNeeded -join ', ')"
-            }
         }
     }
 }

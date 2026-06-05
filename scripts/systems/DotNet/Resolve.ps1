@@ -80,6 +80,43 @@ switch ($Stage) {
             $importModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $importPath -Encoding UTF8
         }
 
+        # Detect upgrades: compare installed versions against NuGet latest
+        $upgradesPath = Join-Path $Context.BuildPath "dotnet.upgrades.json"
+        $upgrades = @()
+
+        $installedTools = @()
+        $rawList = & dotnet tool list --global 2>$null
+        if ($LASTEXITCODE -eq 0 -and $rawList) {
+            $installedTools = @($rawList -split "`r?`n" | Select-Object -Skip 2 | Where-Object { $_.Trim() } | ForEach-Object {
+                $parts = $_ -split '\s{2,}'
+                if ($parts.Count -ge 2) { [pscustomobject]@{ id = $parts[0].Trim().ToLowerInvariant(); version = $parts[1].Trim() } }
+            } | Where-Object { $_ })
+        }
+
+        foreach ($name in $names) {
+            $installed = $installedTools | Where-Object { $_.id -eq $name.ToLowerInvariant() }
+            if (-not $installed) { continue }
+            try {
+                $nugetUrl = "https://api.nuget.org/v3-flatcontainer/$($name.ToLowerInvariant())/index.json"
+                $nugetData = Invoke-RestMethod -Uri $nugetUrl -ErrorAction Stop
+                $latest = @($nugetData.versions | Where-Object { $_ -notmatch '-' }) | Select-Object -Last 1
+                if ($latest -and $latest -ne $installed.version) {
+                    $upgrades += [ordered]@{ id = $name; installed = $installed.version; available = $latest }
+                }
+            } catch { }
+        }
+
+        if ($upgrades.Count -gt 0) {
+            if ($PSCmdlet.ShouldProcess($upgradesPath, "Write dotnet upgrades manifest")) {
+                $upgrades | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
+            }
+            Write-Host "$($upgrades.Count) dotnet tool(s) have upgrades available"
+        } elseif (Test-Path -LiteralPath $upgradesPath) {
+            if ($PSCmdlet.ShouldProcess($upgradesPath, "Remove stale dotnet upgrades manifest")) {
+                Remove-Item -LiteralPath $upgradesPath -Force
+            }
+        }
+
         Write-Host "dotnet: $($names.Count) tool(s) in desired state"
     }
 
@@ -99,16 +136,24 @@ switch ($Stage) {
             return
         }
 
-        # Get currently installed tools
-        $exportPath = Join-Path $Context.ExportPath "dotnet.tools.export.json"
+        # Live check: parse dotnet tool list --global to avoid stale export
+        Write-Host "Querying installed dotnet tools..."
         $installedIds = @()
-        if (Test-Path -LiteralPath $exportPath) {
-            $exportDoc = Get-Content -LiteralPath $exportPath -Raw | ConvertFrom-Json
-            $installedIds = @($exportDoc.packages | ForEach-Object { $_.id })
+        $raw = & dotnet tool list --global 2>$null
+        if ($LASTEXITCODE -eq 0 -and $raw) {
+            $installedIds = @($raw -split "`r?`n" | Select-Object -Skip 2 | Where-Object { $_.Trim() } | ForEach-Object {
+                ($_ -split '\s{2,}')[0].Trim().ToLowerInvariant()
+            } | Where-Object { $_ })
+        }
+
+        $upgradesPath = Join-Path $Context.BuildPath "dotnet.upgrades.json"
+        $upgradeableIds = @()
+        if (Test-Path -LiteralPath $upgradesPath) {
+            $upgradeableIds = @((Get-Content -LiteralPath $upgradesPath -Raw | ConvertFrom-Json) | ForEach-Object { $_.id })
         }
 
         $toInstall = @($desiredPkgs | Where-Object { $installedIds -notcontains $_.ToLowerInvariant() })
-        $toUpdate  = @($desiredPkgs | Where-Object { $installedIds -contains $_.ToLowerInvariant() })
+        $toUpdate  = @($upgradeableIds)
 
         if ($WhatIfPreference) {
             if ($toInstall.Count -eq 0 -and $toUpdate.Count -eq 0) {
@@ -166,6 +211,7 @@ switch ($Stage) {
                     $failed += $item.id
                 }
                 else {
+                    Invoke-RefreshPath
                     Write-Host "$tag Done"
                 }
             }

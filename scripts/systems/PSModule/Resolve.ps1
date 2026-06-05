@@ -121,12 +121,8 @@ switch ($Stage) {
             return
         }
 
-        $exportPath = Join-Path $Context.ExportPath "psmodules.export.json"
-        $installedIds = @()
-        if (Test-Path -LiteralPath $exportPath) {
-            $exportDoc = Get-Content -LiteralPath $exportPath -Raw | ConvertFrom-Json
-            $installedIds = @($exportDoc.packages | ForEach-Object { $_.id })
-        }
+        Write-Host "Querying installed modules..."
+        $installedIds = @(Get-InstalledModule -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name)
 
         $upgradesPath = Join-Path $Context.BuildPath "psmodules.upgrades.json"
         $upgradeableIds = @()

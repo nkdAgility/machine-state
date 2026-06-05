@@ -964,6 +964,13 @@ function Invoke-StageExecute {
     Write-Host "========================================" -ForegroundColor DarkCyan
     Write-Host "  STAGE: Execute [$($Context.MachineName)]" -ForegroundColor DarkCyan
     Write-Host "========================================" -ForegroundColor DarkCyan
+
+    # Clear manual-actions from any prior run so the summary is fresh
+    $manualActionsPath = Join-Path $Context.BuildPath "manual-actions.json"
+    if (Test-Path -LiteralPath $manualActionsPath) {
+        Remove-Item -LiteralPath $manualActionsPath -Force
+    }
+
     foreach ($scriptName in @($MachineState.scripts)) {
         Invoke-ResolverScript -ScriptName $scriptName -Stage Execute -Context $Context
     }
@@ -977,6 +984,10 @@ function Invoke-StageExecute {
             }
         }
     }
+
+    # Print consolidated manual-actions summary
+    . (Join-Path $PSScriptRoot "Resolver-Common.ps1")
+    Write-ManualSummary -Context $Context
 }
 
 function Invoke-StageStatus {

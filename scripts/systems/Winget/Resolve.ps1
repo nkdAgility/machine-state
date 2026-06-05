@@ -61,6 +61,48 @@ function Assert-WingetAvailable {
     }
 }
 
+function Get-WingetInstalledIds {
+    # Returns the set of package IDs currently installed according to a live winget list.
+    $output = & winget list --accept-source-agreements --disable-interactivity 2>$null
+    $ids = [System.Collections.Generic.HashSet[string]]([System.StringComparer]::OrdinalIgnoreCase)
+
+    # Find the separator line (------) to locate column positions from the preceding header
+    $headerIdx = -1
+    $sepIdx    = -1
+    for ($i = 0; $i -lt $output.Count; $i++) {
+        if ($output[$i] -match '^[-\s]{10,}$') {
+            $sepIdx    = $i
+            $headerIdx = $i - 1
+            break
+        }
+    }
+    if ($headerIdx -lt 0) { return $ids }
+
+    # Determine start of the Id column from the header
+    $header = $output[$headerIdx]
+    $idCol  = $header.IndexOf("Id", [System.StringComparison]::OrdinalIgnoreCase)
+    if ($idCol -lt 0) { return $ids }
+
+    # Find end of Id column (start of next column)
+    $nextColStart = $header.Length
+    foreach ($colName in @("Version", "Available", "Source")) {
+        $pos = $header.IndexOf($colName, $idCol + 2, [System.StringComparison]::OrdinalIgnoreCase)
+        if ($pos -gt $idCol -and $pos -lt $nextColStart) { $nextColStart = $pos }
+    }
+
+    for ($i = $sepIdx + 1; $i -lt $output.Count; $i++) {
+        $line = $output[$i]
+        if ($line.Length -le $idCol) { continue }
+        $end   = [Math]::Min($nextColStart, $line.Length)
+        $rawId = $line.Substring($idCol, $end - $idCol).Trim()
+        if ($rawId -and $rawId -notmatch '\s') {
+            [void]$ids.Add($rawId)
+        }
+    }
+
+    return $ids
+}
+
 function Get-WingetVersion {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         return $null
@@ -395,14 +437,12 @@ switch ($Stage) {
             }
         }
 
-        # Diff desired vs installed so we only attempt packages that are actually missing
-        $installedWinget = @()
-        $installedMsstore = @()
-        if (Test-Path -LiteralPath (Join-Path $Context.ExportPath "winget.export.json")) {
-            $exportDoc = Get-Content -LiteralPath (Join-Path $Context.ExportPath "winget.export.json") -Raw | ConvertFrom-Json
-            $installedWinget  = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget'  } | ForEach-Object { $_.Packages.PackageIdentifier })
-            $installedMsstore = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages.PackageIdentifier })
-        }
+        # Live diff: query winget for what is actually installed right now so stale
+        # export files don't cause already-installed packages to be re-attempted.
+        Write-Host "Querying installed packages..."
+        $liveInstalled = Get-WingetInstalledIds
+        $installedWinget  = $liveInstalled
+        $installedMsstore = $liveInstalled
 
         $missingWinget  = @($desiredWinget  | Where-Object { $installedWinget  -notcontains $_ } | Sort-Object { if ($priorityMap.ContainsKey($_)) { $priorityMap[$_] } else { 999 } }, { $_ })
         $missingMsstore = @($desiredMsstore | Where-Object { $installedMsstore -notcontains $_ } | Sort-Object { if ($priorityMap.ContainsKey($_)) { $priorityMap[$_] } else { 999 } }, { $_ })
@@ -446,11 +486,14 @@ switch ($Stage) {
 
                     if ($PSCmdlet.ShouldProcess($item.id, "winget install ($($item.source) source)")) {
                         & winget install --id $item.id --source $item.source --accept-package-agreements --accept-source-agreements
-                        if ($LASTEXITCODE -ne 0) {
-                            Write-Warning "$tag Failed to install $($item.id) (exit code $LASTEXITCODE)"
+                        $exitCode = $LASTEXITCODE
+                        # -1978335189 (0x8A150007) = no upgrade available — package already at latest, treat as success
+                        if ($exitCode -ne 0 -and $exitCode -ne -1978335189) {
+                            Write-Warning "$tag Failed to install $($item.id) (exit code $exitCode)"
                             $failed += $item.id
                         }
                         else {
+                            Invoke-RefreshPath
                             Write-Host "$tag Done"
                             Invoke-AppResolver -PackageId $item.id -ResolverStage Execute -Context $Context
                         }
@@ -463,11 +506,14 @@ switch ($Stage) {
 
                     if ($PSCmdlet.ShouldProcess($item.id, "winget upgrade")) {
                         & winget upgrade --id $item.id --accept-package-agreements --accept-source-agreements
-                        if ($LASTEXITCODE -ne 0) {
-                            Write-Warning "$tag Failed to upgrade $($item.id) (exit code $LASTEXITCODE)"
+                        $exitCode = $LASTEXITCODE
+                        # -1978335189 (0x8A150007) = no upgrade available — already at latest, treat as success
+                        if ($exitCode -ne 0 -and $exitCode -ne -1978335189) {
+                            Write-Warning "$tag Failed to upgrade $($item.id) (exit code $exitCode)"
                             $failed += $item.id
                         }
                         else {
+                            Invoke-RefreshPath
                             Write-Host "$tag Done"
                             Invoke-AppResolver -PackageId $item.id -ResolverStage Execute -Context $Context
                         }
@@ -483,18 +529,13 @@ switch ($Stage) {
             Write-Host "==> Completed: $succeeded/$total succeeded$(if ($failed.Count -gt 0) { ", $($failed.Count) failed: $($failed -join ', ')" })"
         }
 
-        # Print manual installation reminders
+        # Register manual install reminders for the end-of-run summary
         $manualPath = Join-Path $Context.BuildPath "winget.manual.json"
         if (Test-Path -LiteralPath $manualPath) {
             $manualPkgs = @(Get-Content -LiteralPath $manualPath -Raw | ConvertFrom-Json)
-            if ($manualPkgs.Count -gt 0) {
-                Write-Host ""
-                Write-Host "*** MANUAL INSTALLS REQUIRED ***"
-                Write-Host "The following packages must be installed manually (e.g. run without elevation):"
-                foreach ($pkg in $manualPkgs) {
-                    Write-Host "  winget install --id $($pkg.id) --source $($pkg.source) --accept-package-agreements"
-                }
-                Write-Host ""
+            foreach ($pkg in $manualPkgs) {
+                $cmd = "winget install --id $($pkg.id) --source $($pkg.source) --accept-package-agreements"
+                Add-ManualAction -Context $Context -Category "winget" -Description "Install $($pkg.id)" -Command $cmd -Reason "must be installed without elevation"
             }
         }
     }

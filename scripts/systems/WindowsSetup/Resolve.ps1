@@ -106,7 +106,12 @@ $catalog = @(
             (Test-Path "HKLM:\SYSTEM\CurrentControlSet\Services\LxssManager")
         }
         Apply         = {
-            Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart | Out-Null
+            # Enable-WindowsOptionalFeature fails with "Class not registered" in some contexts;
+            # dism.exe is a direct CLI alternative that doesn't rely on the DISM COM object.
+            dism.exe /Online /Enable-Feature /FeatureName:Microsoft-Windows-Subsystem-Linux /All /NoRestart | Out-Null
+        }
+        OnApplied     = {
+            Add-ManualAction -Context $Context -Category "reboot-required" -Description "Reboot to complete WSL (Windows Subsystem for Linux) installation" -Reason "Windows feature enabled — takes effect after restart"
         }
     }
 
@@ -120,7 +125,10 @@ $catalog = @(
             (Get-Service winhv -ErrorAction SilentlyContinue)?.StartType -ne 'Disabled'
         }
         Apply         = {
-            Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart | Out-Null
+            dism.exe /Online /Enable-Feature /FeatureName:VirtualMachinePlatform /All /NoRestart | Out-Null
+        }
+        OnApplied     = {
+            Add-ManualAction -Context $Context -Category "reboot-required" -Description "Reboot to complete Virtual Machine Platform (WSL 2) installation" -Reason "Windows feature enabled — takes effect after restart"
         }
     }
 
@@ -134,7 +142,10 @@ $catalog = @(
             (Get-Service vmms -ErrorAction SilentlyContinue)?.StartType -eq 'Automatic'
         }
         Apply         = {
-            Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -NoRestart | Out-Null
+            dism.exe /Online /Enable-Feature /FeatureName:Microsoft-Hyper-V-All /All /NoRestart | Out-Null
+        }
+        OnApplied     = {
+            Add-ManualAction -Context $Context -Category "reboot-required" -Description "Reboot to complete Hyper-V installation" -Reason "Windows feature enabled — takes effect after restart"
         }
     }
 
