@@ -146,26 +146,7 @@ switch ($Stage) {
             return
         }
 
-        if ($WhatIfPreference) {
-            $installedPkgs = @()
-            if (Test-Path -LiteralPath (Join-Path $Context.ExportPath "uv.tools.export.json")) {
-                $exportDoc = Get-Content -LiteralPath (Join-Path $Context.ExportPath "uv.tools.export.json") -Raw | ConvertFrom-Json
-                $installedPkgs = @($exportDoc.packages | ForEach-Object { $_.id })
-            }
-
-            $missingPkgs = @($desiredPkgs | Where-Object { $installedPkgs -notcontains $_ } | Sort-Object)
-
-            if ($missingPkgs.Count -eq 0) {
-                Write-Host "All uv tools are already installed"
-            }
-            else {
-                Write-Host "Would install $($missingPkgs.Count) uv tool(s):"
-                foreach ($pkg in $missingPkgs) { Write-Host "  - $pkg" }
-            }
-            return
-        }
-
-        # Live check: only install tools not already present
+        # Live check: query what's installed and what has upgrades
         Write-Host "Querying installed uv tools..."
         $installedIds = @()
         $rawJson = & uv tool list --json 2>$null
@@ -178,35 +159,67 @@ switch ($Stage) {
             }
         }
 
-        $pkgsToInstall = @($desiredPkgs | Where-Object { $installedIds -notcontains $_ })
-        $total   = $pkgsToInstall.Count
+        $upgradesPath = Join-Path $Context.BuildPath "uv.upgrades.json"
+        $upgradeableIds = @()
+        if (Test-Path -LiteralPath $upgradesPath) {
+            $upgradeableIds = @((Get-Content -LiteralPath $upgradesPath -Raw | ConvertFrom-Json) | ForEach-Object { $_.id })
+        }
+
+        $toInstall = @($desiredPkgs | Where-Object { $installedIds -notcontains $_ })
+        $toUpgrade = @($upgradeableIds)
+
+        if ($WhatIfPreference) {
+            if ($toInstall.Count -eq 0 -and $toUpgrade.Count -eq 0) {
+                Write-Host "All uv tools are installed and up to date"
+            } else {
+                if ($toInstall.Count -gt 0) {
+                    Write-Host "Would install $($toInstall.Count) uv tool(s):"
+                    foreach ($pkg in $toInstall) { Write-Host "  - $pkg" }
+                }
+                if ($toUpgrade.Count -gt 0) {
+                    Write-Host "Would upgrade $($toUpgrade.Count) uv tool(s):"
+                    foreach ($pkg in $toUpgrade) { Write-Host "  - $pkg" }
+                }
+            }
+            return
+        }
+
+        $workList = @(
+            @($toInstall  | ForEach-Object { [ordered]@{ action = "install"; id = $_ } }) +
+            @($toUpgrade  | ForEach-Object { [ordered]@{ action = "upgrade"; id = $_ } })
+        )
+
+        $total   = $workList.Count
         $current = 0
         $failed  = @()
 
         if ($total -eq 0) {
-            Write-Host "All uv tools are already installed"
-        }
-        else {
+            Write-Host "All uv tools are installed and up to date"
+        } else {
 
         Write-Host ""
-        Write-Host "==> $total uv tool(s) to install/upgrade"
+        Write-Host "==> $total uv tool operation(s) to perform"
         Write-Host ""
 
-        foreach ($pkg in $pkgsToInstall) {
+        foreach ($item in $workList) {
             $current++
             $tag = "[$current/$total]"
             $pct = [int](($current - 1) / $total * 100)
+            $label = "$tag $($item.action.Substring(0,1).ToUpper() + $item.action.Substring(1))ing $($item.id)"
 
-            Write-Progress -Activity "uv" -Status "$tag Installing $pkg" -PercentComplete $pct
-            Write-Host "$tag Installing $pkg"
+            Write-Progress -Activity "uv" -Status $label -PercentComplete $pct
+            Write-Host $label
 
-            if ($PSCmdlet.ShouldProcess($pkg, "Install/upgrade uv tool")) {
-                & uv tool install --upgrade --force $pkg
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Warning "$tag Failed to install uv tool '$pkg' (exit code $LASTEXITCODE)"
-                    $failed += $pkg
+            if ($PSCmdlet.ShouldProcess($item.id, "uv tool $($item.action)")) {
+                if ($item.action -eq "install") {
+                    & uv tool install $item.id
+                } else {
+                    & uv tool upgrade $item.id
                 }
-                else {
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "$tag Failed to $($item.action) uv tool '$($item.id)' (exit code $LASTEXITCODE)"
+                    $failed += $item.id
+                } else {
                     Invoke-RefreshPath
                     Write-Host "$tag Done"
                 }
@@ -221,7 +234,7 @@ switch ($Stage) {
         Write-Host "==> Completed: $succeeded/$total succeeded$(if ($failed.Count -gt 0) { ", $($failed.Count) failed: $($failed -join ', ')" })"
 
         if ($failed.Count -gt 0) {
-            Write-Warning "uv: $($failed.Count) tool(s) failed to install: $($failed -join ', ')"
+            Write-Warning "uv: $($failed.Count) tool(s) failed: $($failed -join ', ')"
         }
 
         } # end else ($total -gt 0)
