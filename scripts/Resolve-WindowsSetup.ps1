@@ -168,6 +168,19 @@ $catalog = @(
         }
     }
 
+    @{
+        Id            = "sudo"
+        Name          = "Windows sudo (forceNewWindow — elevate without a new UAC session)"
+        RequiresAdmin = $false
+        Check         = {
+            $val = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Sudo" -Name Enabled -ErrorAction SilentlyContinue
+            $val -and $val.Enabled -eq 1
+        }
+        Apply         = {
+            sudo config --enable forceNewWindow
+        }
+    }
+
 )
 
 Invoke-SetupStage -Stage $Stage -Context $Context -Topic "windows" -Catalog $catalog

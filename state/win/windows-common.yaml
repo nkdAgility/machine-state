@@ -37,9 +37,6 @@ exclusions:
 uv:
   packages:
     uv:
-    - id: "No"
-      name: "No"
-      required: true
     - name: specify-cli
       required: true
       id: specify-cli
@@ -56,6 +53,7 @@ setup:
   - hyper-v
   - office-insider-beta
   - office-insider-behavior
+  - sudo
 winget:
   packages:
     msstore:

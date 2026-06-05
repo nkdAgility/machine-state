@@ -148,3 +148,11 @@ working/          ← generated outputs, gitignored except .gitkeep
 9. **No Bash.** PowerShell 7+ only.
 
 10. **No hidden LLM dependency.** Every script must run without an LLM present.
+
+11. **Windows `sudo` is available.** The machine runs Windows 11 with `sudo` enabled in
+    `forceNewWindow` mode (`sudo config --enable forceNewWindow`). Scripts that need
+    elevation can prefix commands with `sudo` rather than requiring a separate admin
+    session. The `sudo` setup entry in `state/win/windows-common.yaml` ensures this is
+    configured on every Windows machine. Catalog items with `RequiresAdmin = $true` in
+    app resolvers are applied via the engine's admin-elevation path; they should not
+    inline `sudo` themselves.

@@ -11,19 +11,21 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "..\..\Resolver-Common.ps1")
 
-$configSource = Join-Path $env:USERPROFILE ".config\ohmyposh\nkdagility.omp.json"
-$configDest   = Join-Path $Context.RepositoryRoot "state\config\JanDeDobbeleer.OhMyPosh\ohmyposh.nkdagility.json"
-
-Write-Host "  [ohmyposh] Capture: saving current Oh My Posh config to repo..."
-
-if (-not (Test-Path -LiteralPath $configSource)) {
-    Write-Warning "  [ohmyposh] Config not found at '$configSource' - skipping."
+if (-not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
+    Write-Warning "  [ohmyposh] oh-my-posh not found on PATH - skipping capture."
     return
 }
 
+$configDest = Join-Path $Context.RepositoryRoot "state\config\JanDeDobbeleer.OhMyPosh\ohmyposh.nkdagility.json"
+
+Write-Host "  [ohmyposh] Capture: exporting current Oh My Posh config to repo..."
+
 New-DirectoryIfMissing -Path (Split-Path -Parent $configDest)
 
-if ($PSCmdlet.ShouldProcess($configDest, "Capture Oh My Posh config")) {
-    Copy-Item -LiteralPath $configSource -Destination $configDest -Force
+if ($PSCmdlet.ShouldProcess($configDest, "Export Oh My Posh config")) {
+    & oh-my-posh config export --output $configDest
+    if ($LASTEXITCODE -ne 0) {
+        throw "  [ohmyposh] oh-my-posh config export failed (exit $LASTEXITCODE)"
+    }
     Write-Host "  [ohmyposh] Config saved: '$configDest'"
 }
