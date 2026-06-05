@@ -402,44 +402,70 @@ switch ($Stage) {
 
         $failed = @()
 
-        foreach ($pkg in $missingWinget) {
-            if ($PSCmdlet.ShouldProcess($pkg, "winget install (winget source)")) {
-                Write-Host "Installing $pkg..."
-                & winget install --id $pkg --source winget --accept-package-agreements --accept-source-agreements
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Warning "Failed to install $pkg (exit code $LASTEXITCODE)"
-                    $failed += $pkg
-                }
-            }
-        }
+        # Build a flat ordered work list so we can show unified progress
+        $workList = @(
+            @($missingWinget  | ForEach-Object { [ordered]@{ action = "install"; source = "winget";  id = $_ } }),
+            @($missingMsstore | ForEach-Object { [ordered]@{ action = "install"; source = "msstore"; id = $_ } }),
+            @($upgradeableWinget | ForEach-Object { [ordered]@{ action = "upgrade"; source = "winget"; id = $_.id; from = $_.installed; to = $_.available } })
+        )
 
-        foreach ($pkg in $missingMsstore) {
-            if ($PSCmdlet.ShouldProcess($pkg, "winget install (msstore source)")) {
-                Write-Host "Installing $pkg..."
-                & winget install --id $pkg --source msstore --accept-package-agreements --accept-source-agreements
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Warning "Failed to install $pkg (exit code $LASTEXITCODE)"
-                    $failed += $pkg
-                }
-            }
-        }
+        $total   = $workList.Count
+        $current = 0
+        $failed  = @()
 
-        foreach ($pkg in $upgradeableWinget) {
-            if ($PSCmdlet.ShouldProcess($pkg.id, "winget upgrade")) {
-                Write-Host "Upgrading $($pkg.id) ($($pkg.installed) -> $($pkg.available))..."
-                & winget upgrade --id $pkg.id --accept-package-agreements --accept-source-agreements
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Warning "Failed to upgrade $($pkg.id) (exit code $LASTEXITCODE)"
-                    $failed += $pkg.id
-                }
-            }
-        }
-
-        if ($missingWinget.Count -eq 0 -and $missingMsstore.Count -eq 0 -and $upgradeableWinget.Count -eq 0) {
+        if ($total -eq 0) {
             Write-Host "All winget packages are installed and up to date"
         }
-        elseif ($failed.Count -gt 0) {
-            Write-Warning "$($failed.Count) package(s) failed: $($failed -join ', ')"
+        else {
+            Write-Host ""
+            Write-Host "==> $total package operation(s) to perform"
+            Write-Host ""
+
+            foreach ($item in $workList) {
+                $current++
+                $pct     = [int](($current - 1) / $total * 100)
+                $tag     = "[$current/$total]"
+
+                if ($item.action -eq "install") {
+                    $label = "$tag Installing $($item.id)"
+                    Write-Progress -Activity "winget" -Status $label -PercentComplete $pct
+                    Write-Host "$label"
+
+                    if ($PSCmdlet.ShouldProcess($item.id, "winget install ($($item.source) source)")) {
+                        & winget install --id $item.id --source $item.source --accept-package-agreements --accept-source-agreements
+                        if ($LASTEXITCODE -ne 0) {
+                            Write-Warning "$tag Failed to install $($item.id) (exit code $LASTEXITCODE)"
+                            $failed += $item.id
+                        }
+                        else {
+                            Write-Host "$tag Done"
+                        }
+                    }
+                }
+                else {
+                    $label = "$tag Upgrading $($item.id)  $($item.from) -> $($item.to)"
+                    Write-Progress -Activity "winget" -Status $label -PercentComplete $pct
+                    Write-Host "$label"
+
+                    if ($PSCmdlet.ShouldProcess($item.id, "winget upgrade")) {
+                        & winget upgrade --id $item.id --accept-package-agreements --accept-source-agreements
+                        if ($LASTEXITCODE -ne 0) {
+                            Write-Warning "$tag Failed to upgrade $($item.id) (exit code $LASTEXITCODE)"
+                            $failed += $item.id
+                        }
+                        else {
+                            Write-Host "$tag Done"
+                        }
+                    }
+                }
+
+                Write-Host ""
+            }
+
+            Write-Progress -Activity "winget" -Completed
+
+            $succeeded = $total - $failed.Count
+            Write-Host "==> Completed: $succeeded/$total succeeded$(if ($failed.Count -gt 0) { ", $($failed.Count) failed: $($failed -join ', ')" })"
         }
 
         # Print manual installation reminders
