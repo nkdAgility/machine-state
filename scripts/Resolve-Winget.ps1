@@ -235,7 +235,7 @@ switch ($Stage) {
                       @($msstorePackages | ForEach-Object { Get-ObjectValue -Object $_ -Name "id" })
 
         Write-Host "Checking for available upgrades..."
-        $upgradeOutput = & winget upgrade --include-unknown 2>$null
+        $upgradeOutput = & winget upgrade --include-unknown --accept-source-agreements 2>$null
         $upgrades = @()
 
         # Parse winget upgrade output (table format)
