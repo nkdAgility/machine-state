@@ -15,9 +15,10 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "Setup-Engine.ps1")
 
-$settings = @(
+$catalog = @(
 
     @{
+        Id            = "long-paths"
         Name          = "Long paths (core.longpaths)"
         RequiresAdmin = $true
         Check         = {
@@ -29,6 +30,7 @@ $settings = @(
     }
 
     @{
+        Id            = "default-branch"
         Name          = "Default branch name (init.defaultBranch = main)"
         RequiresAdmin = $false
         Check         = {
@@ -40,6 +42,7 @@ $settings = @(
     }
 
     @{
+        Id            = "autocrlf"
         Name          = "Line endings (core.autocrlf = true)"
         RequiresAdmin = $false
         Check         = {
@@ -51,6 +54,7 @@ $settings = @(
     }
 
     @{
+        Id            = "pull-rebase"
         Name          = "Pull strategy (pull.rebase = false)"
         RequiresAdmin = $false
         Check         = {
@@ -62,6 +66,7 @@ $settings = @(
     }
 
     @{
+        Id            = "editor-vscode"
         Name          = "Default editor (core.editor = VS Code)"
         RequiresAdmin = $false
         Check         = {
@@ -73,6 +78,7 @@ $settings = @(
     }
 
     @{
+        Id            = "diff-tool-vscode"
         Name          = "Diff tool (diff.tool = vscode)"
         RequiresAdmin = $false
         Check         = {
@@ -85,6 +91,7 @@ $settings = @(
     }
 
     @{
+        Id            = "merge-tool-vscode"
         Name          = "Merge tool (merge.tool = vscode)"
         RequiresAdmin = $false
         Check         = {
@@ -98,4 +105,4 @@ $settings = @(
 
 )
 
-Invoke-SetupStage -Stage $Stage -Context $Context -Topic "Git" -Settings $settings
+Invoke-SetupStage -Stage $Stage -Context $Context -Topic "git" -Catalog $catalog

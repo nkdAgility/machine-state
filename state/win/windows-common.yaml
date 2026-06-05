@@ -429,3 +429,23 @@ winget:
       name: Zoom.Zoom.EXE
 platform: win
 
+setup:
+  windows:
+    - long-paths
+    - execution-policy
+    - developer-mode
+    - show-file-extensions
+    - show-hidden-files
+    - show-protected-files
+    - wsl
+    - virtual-machine-platform
+    - hyper-v
+  git:
+    - long-paths
+    - default-branch
+    - autocrlf
+    - pull-rebase
+    - editor-vscode
+    - diff-tool-vscode
+    - merge-tool-vscode
+

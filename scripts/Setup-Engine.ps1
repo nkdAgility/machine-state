@@ -12,13 +12,43 @@ function New-DirectoryIfMissing {
     }
 }
 
+function Get-EnabledSettings {
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Context,
+        [Parameter(Mandatory)][string]$Topic,
+        [Parameter(Mandatory)][array]$Catalog
+    )
+
+    # If no merged state yet, return the full catalog
+    if (-not (Test-Path -LiteralPath $Context.MergedStateJson)) {
+        return $Catalog
+    }
+
+    $mergedState = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
+    $setupNode   = $mergedState.PSObject.Properties['setup']
+    if (-not $setupNode) { return $Catalog }
+
+    $topicNode = $setupNode.Value.PSObject.Properties[$Topic.ToLowerInvariant()]
+    if (-not $topicNode) { return $Catalog }
+
+    $enabledIds = @($topicNode.Value | Where-Object { $_ } | ForEach-Object { [string]$_ })
+    if ($enabledIds.Count -eq 0) { return $Catalog }
+
+    return @($Catalog | Where-Object {
+        $id = $_.PSObject.Properties['Id'] ? $_.Id : $_.id
+        $enabledIds -contains $id
+    })
+}
+
 function Invoke-SetupStage {
     param(
         [Parameter(Mandatory)][ValidateSet("Export","Build","Execute")][string]$Stage,
         [Parameter(Mandatory)][pscustomobject]$Context,
         [Parameter(Mandatory)][string]$Topic,
-        [Parameter(Mandatory)][array]$Settings
+        [Parameter(Mandatory)][array]$Catalog
     )
+
+    $Settings = Get-EnabledSettings -Context $Context -Topic $Topic -Catalog $Catalog
 
     $exportPath = Join-Path $Context.ExportPath "$Topic.setup.json"
 

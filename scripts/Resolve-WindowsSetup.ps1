@@ -15,9 +15,10 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "Setup-Engine.ps1")
 
-$settings = @(
+$catalog = @(
 
     @{
+        Id            = "long-paths"
         Name          = "Windows long paths (registry)"
         RequiresAdmin = $true
         Check         = {
@@ -30,6 +31,7 @@ $settings = @(
     }
 
     @{
+        Id            = "execution-policy"
         Name          = "PowerShell execution policy (RemoteSigned)"
         RequiresAdmin = $true
         Check         = {
@@ -41,6 +43,7 @@ $settings = @(
     }
 
     @{
+        Id            = "developer-mode"
         Name          = "Developer mode"
         RequiresAdmin = $true
         Check         = {
@@ -55,6 +58,7 @@ $settings = @(
     }
 
     @{
+        Id            = "show-file-extensions"
         Name          = "Show file extensions in Explorer"
         RequiresAdmin = $false
         Check         = {
@@ -67,6 +71,7 @@ $settings = @(
     }
 
     @{
+        Id            = "show-hidden-files"
         Name          = "Show hidden files in Explorer"
         RequiresAdmin = $false
         Check         = {
@@ -79,6 +84,7 @@ $settings = @(
     }
 
     @{
+        Id            = "show-protected-files"
         Name          = "Show protected OS files in Explorer"
         RequiresAdmin = $false
         Check         = {
@@ -91,6 +97,7 @@ $settings = @(
     }
 
     @{
+        Id            = "wsl"
         Name          = "WSL (Windows Subsystem for Linux)"
         RequiresAdmin = $true
         Check         = {
@@ -103,6 +110,7 @@ $settings = @(
     }
 
     @{
+        Id            = "virtual-machine-platform"
         Name          = "Virtual Machine Platform (WSL 2)"
         RequiresAdmin = $true
         Check         = {
@@ -115,6 +123,7 @@ $settings = @(
     }
 
     @{
+        Id            = "hyper-v"
         Name          = "Hyper-V"
         RequiresAdmin = $true
         Check         = {
@@ -128,4 +137,4 @@ $settings = @(
 
 )
 
-Invoke-SetupStage -Stage $Stage -Context $Context -Topic "Windows" -Settings $settings
+Invoke-SetupStage -Stage $Stage -Context $Context -Topic "windows" -Catalog $catalog

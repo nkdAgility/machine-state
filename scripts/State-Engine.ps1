@@ -319,6 +319,25 @@ function Get-CombinedExclusionIds {
     return @($result | Sort-Object -Unique)
 }
 
+function Get-SetupTopicIds {
+    param(
+        [Parameter(Mandatory)][AllowNull()][object]$StateObject,
+        [Parameter(Mandatory)][string]$Topic
+    )
+
+    if ($null -eq $StateObject) { return @() }
+    $setupNode = Get-ObjectValue -Object $StateObject -Name "setup"
+    if (-not $setupNode) { return @() }
+    $topicNode = Get-ObjectValue -Object $setupNode -Name $Topic
+    if (-not $topicNode) { return @() }
+    return @($topicNode | Where-Object { $_ } | ForEach-Object { [string]$_ })
+}
+
+function Merge-SetupTopicIds {
+    param([AllowNull()][array]$Ids)
+    return @($Ids | Where-Object { $_ } | Sort-Object -Unique)
+}
+
 function Get-GitRepos {
     param(
         [Parameter(Mandatory)]
@@ -366,31 +385,37 @@ function Merge-MachineState {
     $machineState = Read-YamlFile -Path $MachineStatePath
     $stateObjects = @()
 
-    $wingetPackages = @()
+    $wingetPackages  = @()
     $msstorePackages = @()
-    $npmPackages = @()
-    $uvPackages = @()
-    $gitRepos = @()
+    $npmPackages     = @()
+    $uvPackages      = @()
+    $gitRepos        = @()
+    $setupWindows    = @()
+    $setupGit        = @()
 
     foreach ($relativePath in @($machineState.state)) {
         $resolvedSharedPath = Join-Path (Split-Path -Parent $MachineStatePath) $relativePath
         $sharedState = Read-YamlFile -Path $resolvedSharedPath
         $stateObjects += $sharedState
 
-        $wingetPackages += @(Get-SourcePackages -StateObject $sharedState -SourceName "winget")
+        $wingetPackages  += @(Get-SourcePackages -StateObject $sharedState -SourceName "winget")
         $msstorePackages += @(Get-SourcePackages -StateObject $sharedState -SourceName "msstore")
-        $npmPackages += @(Get-SectionPackages -StateObject $sharedState -SectionName "node" -SourceName "npm")
-        $uvPackages += @(Get-SectionPackages -StateObject $sharedState -SectionName "uv" -SourceName "uv")
-        $gitRepos += @(Get-GitRepos -StateObject $sharedState)
+        $npmPackages     += @(Get-SectionPackages -StateObject $sharedState -SectionName "node" -SourceName "npm")
+        $uvPackages      += @(Get-SectionPackages -StateObject $sharedState -SectionName "uv" -SourceName "uv")
+        $gitRepos        += @(Get-GitRepos -StateObject $sharedState)
+        $setupWindows    += @(Get-SetupTopicIds -StateObject $sharedState -Topic "windows")
+        $setupGit        += @(Get-SetupTopicIds -StateObject $sharedState -Topic "git")
     }
 
     $stateObjects += $machineState
 
-    $wingetPackages += @(Get-SourcePackages -StateObject $machineState -SourceName "winget")
+    $wingetPackages  += @(Get-SourcePackages -StateObject $machineState -SourceName "winget")
     $msstorePackages += @(Get-SourcePackages -StateObject $machineState -SourceName "msstore")
-    $npmPackages += @(Get-SectionPackages -StateObject $machineState -SectionName "node" -SourceName "npm")
-    $uvPackages += @(Get-SectionPackages -StateObject $machineState -SectionName "uv" -SourceName "uv")
-    $gitRepos += @(Get-GitRepos -StateObject $machineState)
+    $npmPackages     += @(Get-SectionPackages -StateObject $machineState -SectionName "node" -SourceName "npm")
+    $uvPackages      += @(Get-SectionPackages -StateObject $machineState -SectionName "uv" -SourceName "uv")
+    $gitRepos        += @(Get-GitRepos -StateObject $machineState)
+    $setupWindows    += @(Get-SetupTopicIds -StateObject $machineState -Topic "windows")
+    $setupGit        += @(Get-SetupTopicIds -StateObject $machineState -Topic "git")
 
     # cloneRoot is machine-specific — read from machine YAML only
     $machineGitNode = Get-ObjectValue -Object $machineState -Name "git"
@@ -480,6 +505,10 @@ function Merge-MachineState {
         git          = [ordered]@{
             cloneRoot = $cloneRoot
             repos     = $mergedGitRepos
+        }
+        setup        = [ordered]@{
+            windows = @(Merge-SetupTopicIds -Ids $setupWindows)
+            git     = @(Merge-SetupTopicIds -Ids $setupGit)
         }
     }
 
