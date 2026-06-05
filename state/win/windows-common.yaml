@@ -1,6 +1,7 @@
 exclusions:
   packages:
-    msstore: []
+    msstore:
+    - Microsoft.VisualStudioCode
     winget:
     - Canonical.Ubuntu.1804
     - Microsoft.DotNet.DesktopRuntime.6
@@ -16,6 +17,7 @@ exclusions:
     - Microsoft.VCRedist.2010.x86
     - Microsoft.VCRedist.2013.x64
     - Microsoft.VCRedist.2013.x86
+    - Microsoft.VisualStudioCode.Insiders
     - Microsoft.WindowsAppRuntime.1.1
     - Microsoft.WindowsAppRuntime.1.2
     - Microsoft.WindowsAppRuntime.1.5
