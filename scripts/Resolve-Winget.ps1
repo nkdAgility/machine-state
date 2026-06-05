@@ -223,8 +223,26 @@ switch ($Stage) {
 
         $mergedState = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
 
-        $wingetPackages = @(Get-SourcePackages -StateObject $mergedState -SourceName "winget")
-        $msstorePackages = @(Get-SourcePackages -StateObject $mergedState -SourceName "msstore")
+        $allWingetPackages  = @(Get-SourcePackages -StateObject $mergedState -SourceName "winget")
+        $allMsstorePackages = @(Get-SourcePackages -StateObject $mergedState -SourceName "msstore")
+
+        # Split into automated and manual packages
+        $wingetPackages  = @($allWingetPackages  | Where-Object { -not (Get-ObjectValue -Object $_ -Name "manual") })
+        $msstorePackages = @($allMsstorePackages | Where-Object { -not (Get-ObjectValue -Object $_ -Name "manual") })
+        $manualPackages  = @(
+            ($allWingetPackages  | Where-Object { Get-ObjectValue -Object $_ -Name "manual" } | ForEach-Object { [ordered]@{ id = [string](Get-ObjectValue -Object $_ -Name "id"); source = "winget"  } }),
+            ($allMsstorePackages | Where-Object { Get-ObjectValue -Object $_ -Name "manual" } | ForEach-Object { [ordered]@{ id = [string](Get-ObjectValue -Object $_ -Name "id"); source = "msstore" } })
+        )
+
+        # Write manual package list
+        $manualPath = Join-Path $Context.BuildPath "winget.manual.json"
+        if ($manualPackages.Count -gt 0) {
+            $manualPackages | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manualPath -Encoding UTF8
+            Write-Host "$($manualPackages.Count) package(s) marked for manual installation"
+        }
+        elseif (Test-Path -LiteralPath $manualPath) {
+            Remove-Item -LiteralPath $manualPath -Force
+        }
 
         $wingetVersion = Get-WingetVersion
 
@@ -244,9 +262,9 @@ switch ($Stage) {
             $importModel | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $Context.WingetImportPath -Encoding UTF8
         }
 
-        # Detect packages with available upgrades (filtered to desired packages)
+        # Detect packages with available upgrades (filtered to automated desired packages only)
         $upgradesPath = Join-Path $Context.BuildPath "winget.upgrades.json"
-        $desiredIds = @($wingetPackages | ForEach-Object { Get-ObjectValue -Object $_ -Name "id" }) + 
+        $desiredIds = @($wingetPackages | ForEach-Object { Get-ObjectValue -Object $_ -Name "id" }) +
                       @($msstorePackages | ForEach-Object { Get-ObjectValue -Object $_ -Name "id" })
 
         Write-Host "Checking for available upgrades..."
@@ -405,6 +423,21 @@ switch ($Stage) {
         }
         elseif ($failed.Count -gt 0) {
             Write-Warning "$($failed.Count) package(s) failed: $($failed -join ', ')"
+        }
+
+        # Print manual installation reminders
+        $manualPath = Join-Path $Context.BuildPath "winget.manual.json"
+        if (Test-Path -LiteralPath $manualPath) {
+            $manualPkgs = @(Get-Content -LiteralPath $manualPath -Raw | ConvertFrom-Json)
+            if ($manualPkgs.Count -gt 0) {
+                Write-Host ""
+                Write-Host "*** MANUAL INSTALLS REQUIRED ***"
+                Write-Host "The following packages must be installed manually (e.g. run without elevation):"
+                foreach ($pkg in $manualPkgs) {
+                    Write-Host "  winget install --id $($pkg.id) --source $($pkg.source) --accept-package-agreements"
+                }
+                Write-Host ""
+            }
         }
     }
 }
