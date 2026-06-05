@@ -13,6 +13,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "Resolver-Common.ps1")
+
 function Assert-WingetAvailable {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         throw "Winget was not found on PATH. Install Winget before running stage '$Stage'."
@@ -32,47 +34,6 @@ function Get-WingetVersion {
     }
     catch {
         return $null
-    }
-
-    return $null
-}
-
-function New-DirectoryIfMissing {
-    param(
-        [Parameter(Mandatory)]
-        [string]$Path
-    )
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
-    }
-}
-
-function Get-ObjectValue {
-    param(
-        [Parameter(Mandatory)]
-        [AllowNull()]
-        [object]$Object,
-
-        [Parameter(Mandatory)]
-        [string]$Name
-    )
-
-    if ($null -eq $Object) {
-        return $null
-    }
-
-    if ($Object -is [System.Collections.IDictionary]) {
-        if ($Object.Contains($Name)) {
-            return $Object[$Name]
-        }
-
-        return $null
-    }
-
-    $property = $Object.PSObject.Properties[$Name]
-    if ($property) {
-        return $property.Value
     }
 
     return $null

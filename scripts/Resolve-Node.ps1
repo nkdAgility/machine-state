@@ -13,73 +13,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Invoke-RefreshPath {
-    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" +
-                [System.Environment]::GetEnvironmentVariable("PATH", "User")
-}
-
-function Install-NodeIfMissing {
-    if (Get-Command npm -ErrorAction SilentlyContinue) { return }
-
-    Write-Host "Node.js/npm not found - installing via winget..."
-    & winget install --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to install Node.js via winget (exit code $LASTEXITCODE)."
-    }
-
-    Invoke-RefreshPath
-
-    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-        throw "npm still not found on PATH after installing Node.js. Open a new terminal and re-run."
-    }
-}
-
-function New-DirectoryIfMissing {
-    param([Parameter(Mandatory)][string]$Path)
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
-    }
-}
-
-function Get-ObjectValue {
-    param(
-        [Parameter(Mandatory)][AllowNull()][object]$Object,
-        [Parameter(Mandatory)][string]$Name
-    )
-
-    if ($null -eq $Object) { return $null }
-
-    if ($Object -is [System.Collections.IDictionary]) {
-        if ($Object.Contains($Name)) { return $Object[$Name] }
-        return $null
-    }
-
-    $property = $Object.PSObject.Properties[$Name]
-    if ($property) { return $property.Value }
-    return $null
-}
-
-function Get-SectionPackages {
-    param(
-        [Parameter(Mandatory)][object]$StateObject,
-        [Parameter(Mandatory)][string]$SectionName,
-        [Parameter(Mandatory)][string]$SourceName
-    )
-
-    $sectionNode = Get-ObjectValue -Object $StateObject -Name $SectionName
-    $packagesNode = Get-ObjectValue -Object $sectionNode -Name "packages"
-    $sourceNode = Get-ObjectValue -Object $packagesNode -Name $SourceName
-    if (-not $sourceNode) {
-        return @()
-    }
-
-    return @($sourceNode)
-}
+. (Join-Path $PSScriptRoot "Resolver-Common.ps1")
 
 switch ($Stage) {
     "Export" {
-        Install-NodeIfMissing
+        Install-ToolIfMissing -Command npm -WingetId OpenJS.NodeJS.LTS -DisplayName "Node.js"
         New-DirectoryIfMissing -Path $Context.ExportPath
 
         $raw = & npm list -g --depth=0 --json 2>$null
@@ -179,7 +117,7 @@ switch ($Stage) {
     }
 
     "Execute" {
-        Install-NodeIfMissing
+        Install-ToolIfMissing -Command npm -WingetId OpenJS.NodeJS.LTS -DisplayName "Node.js"
 
         if (-not (Test-Path -LiteralPath (Join-Path $Context.BuildPath "node.npm.import.json"))) {
             throw "npm import manifest was not found at '$((Join-Path $Context.BuildPath "node.npm.import.json"))'. Run build first."
