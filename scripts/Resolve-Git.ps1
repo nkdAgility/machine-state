@@ -158,9 +158,10 @@ switch ($Stage) {
 
         # Desired repos: clone if missing, pull if present
         foreach ($repo in $config.Repos) {
-            $url    = [string]$repo.url
-            $folder = if ($repo.folder) { [string]$repo.folder } else { Get-RepoFolderName $url }
-            $path   = Join-Path $config.CloneRoot $folder
+            $url       = [string](Get-SafeProperty $repo 'url')
+            $rawFolder = Get-SafeProperty $repo 'folder'
+            $folder    = if ($rawFolder) { [string]$rawFolder } else { Get-RepoFolderName $url }
+            $path      = Join-Path $config.CloneRoot $folder
 
             if ($clonedUrls -contains $url.ToLowerInvariant()) {
                 $toPull += [ordered]@{ url = $url; path = $path; folder = $folder; managed = $true }
@@ -193,7 +194,7 @@ switch ($Stage) {
             $ops | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Context.GitOpsPath -Encoding UTF8
         }
 
-        $extraCount = ($toPull | Where-Object { -not $_.managed }).Count
+        $extraCount = ($toPull | Where-Object { -not (Get-SafeProperty $_ 'managed') }).Count
         Write-Host "git: $($toClone.Count) to clone, $($toPull.Count) to pull ($extraCount local-only)"
     }
 
