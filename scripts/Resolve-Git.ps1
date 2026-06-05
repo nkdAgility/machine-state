@@ -34,6 +34,17 @@ function Install-GitIfMissing {
     }
 }
 
+function Enable-GitLongPaths {
+    $current = & git config --system core.longpaths 2>$null
+    if ($current -ne 'true') {
+        Write-Host "Enabling git long path support (core.longpaths=true)..."
+        & git config --system core.longpaths true
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Failed to set core.longpaths - clone of repos with long filenames may fail. Try running as administrator."
+        }
+    }
+}
+
 function Get-RepoFolderName {
     param([Parameter(Mandatory)][string]$Url)
 
@@ -208,6 +219,7 @@ switch ($Stage) {
 
     "Execute" {
         Install-GitIfMissing
+        Enable-GitLongPaths
 
         if (-not (Test-Path -LiteralPath $Context.GitOpsPath)) {
             throw "git ops manifest not found at '$($Context.GitOpsPath)'. Run build first."
