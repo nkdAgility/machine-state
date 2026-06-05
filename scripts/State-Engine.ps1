@@ -571,16 +571,15 @@ function Get-MachineContext {
         MachineStatePath = $MachineStatePath
         WorkingPath      = $workingPath
         ExportPath       = Join-Path $workingPath "export"
-        MergePath        = Join-Path $workingPath "merge"
+        MergePath        = $workingPath
         BuildPath        = Join-Path $workingPath "build"
         LogsPath         = Join-Path $workingPath "logs"
-        MergedStateYaml  = Join-Path (Join-Path $workingPath "merge") "machine-state.merged.yaml"
-        MergedStateJson  = Join-Path (Join-Path $workingPath "merge") "machine-state.merged.json"
+        MergedStateYaml  = Join-Path $workingPath "machine-state.yaml"
+        MergedStateJson  = Join-Path $workingPath "machine-state.json"
     }
 
     New-DirectoryIfMissing -Path $context.WorkingPath
     New-DirectoryIfMissing -Path $context.ExportPath
-    New-DirectoryIfMissing -Path $context.MergePath
     New-DirectoryIfMissing -Path $context.BuildPath
     New-DirectoryIfMissing -Path $context.LogsPath
 
@@ -607,11 +606,11 @@ function Get-MachineContextReadOnly {
         MachineStatePath = $MachineStatePath
         WorkingPath      = $workingPath
         ExportPath       = Join-Path $workingPath "export"
-        MergePath        = Join-Path $workingPath "merge"
+        MergePath        = $workingPath
         BuildPath        = Join-Path $workingPath "build"
         LogsPath         = Join-Path $workingPath "logs"
-        MergedStateYaml  = Join-Path (Join-Path $workingPath "merge") "machine-state.merged.yaml"
-        MergedStateJson  = Join-Path (Join-Path $workingPath "merge") "machine-state.merged.json"
+        MergedStateYaml  = Join-Path $workingPath "machine-state.yaml"
+        MergedStateJson  = Join-Path $workingPath "machine-state.json"
         WingetImportPath = Join-Path (Join-Path $workingPath "build") "winget.import.json"
         WingetExportPath = Join-Path (Join-Path $workingPath "export") "winget.export.json"
         NodeImportPath   = Join-Path (Join-Path $workingPath "build") "node.npm.import.json"
