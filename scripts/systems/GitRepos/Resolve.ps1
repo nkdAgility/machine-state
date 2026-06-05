@@ -132,7 +132,7 @@ switch ($Stage) {
         $clonedUrls = @()
         if (Test-Path -LiteralPath $(Join-Path $Context.ExportPath "git.export.json")) {
             $export = Get-Content -LiteralPath $(Join-Path $Context.ExportPath "git.export.json") -Raw | ConvertFrom-Json
-            $clonedUrls = @($export.repos | ForEach-Object { Normalize-RepoUrl $_.url })
+            $clonedUrls = @($export.repos | Where-Object { $_.url } | ForEach-Object { Normalize-RepoUrl $_.url })
         }
 
         $toClone   = @()
@@ -142,6 +142,7 @@ switch ($Stage) {
         # Desired repos: clone if missing, pull if present
         foreach ($repo in $config.Repos) {
             $url       = [string](Get-SafeProperty $repo 'url')
+            if (-not $url) { Write-Warning "Skipping git repo entry with no url"; continue }
             $rawFolder = Get-SafeProperty $repo 'folder'
             $folder    = if ($rawFolder) { [string]$rawFolder } else { Get-RepoFolderName $url }
             $path      = Join-Path $config.CloneRoot $folder

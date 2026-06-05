@@ -159,6 +159,10 @@ winget:
       id: AgileBits.1Password
     - required: true
       priority: 10
+      name: AgileBits.1Password.CLI
+      id: AgileBits.1Password.CLI
+    - required: true
+      priority: 10
       name: Anthropic.Claude
       id: Anthropic.Claude
     - required: true

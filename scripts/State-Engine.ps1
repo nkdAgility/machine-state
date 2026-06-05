@@ -620,6 +620,33 @@ function Get-MachineContextReadOnly {
     }
 }
 
+$script:StageErrors = [System.Collections.Generic.List[pscustomobject]]::new()
+
+function Add-StageError {
+    param([string]$Stage, [string]$Label, [string]$Message)
+    $script:StageErrors.Add([pscustomobject]@{ Stage = $Stage; Label = $Label; Message = $Message })
+}
+
+function Write-StageSummary {
+    if ($script:StageErrors.Count -eq 0) {
+        Write-Host ""
+        Write-Host "========================================" -ForegroundColor Green
+        Write-Host "  COMPLETED — no errors" -ForegroundColor Green
+        Write-Host "========================================" -ForegroundColor Green
+        return
+    }
+
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Red
+    Write-Host "  COMPLETED WITH $($script:StageErrors.Count) ERROR(S)" -ForegroundColor Red
+    Write-Host "========================================" -ForegroundColor Red
+    foreach ($e in $script:StageErrors) {
+        Write-Host "  [$($e.Stage)] $($e.Label)" -ForegroundColor Red
+        Write-Host "    $($e.Message)" -ForegroundColor Yellow
+    }
+    Write-Host "========================================" -ForegroundColor Red
+}
+
 function Invoke-ResolverScript {
     param(
         [Parameter(Mandatory)]
@@ -638,13 +665,17 @@ function Invoke-ResolverScript {
         throw "Resolver script not found: $resolverPath"
     }
 
-    # All stages respect WhatIf; Merge always runs (forced via Invoke-StageMerge)
-    # so that Execute can compute what would happen even in WhatIf mode.
     $passWhatIf = $WhatIfPreference
     $label = Split-Path -Leaf (Split-Path -Parent $resolverPath)
     Write-Host ""
     Write-Host "--- $Stage : $label ---" -ForegroundColor Cyan
-    & $resolverPath -Stage $Stage -Context $Context -WhatIf:$passWhatIf
+    try {
+        & $resolverPath -Stage $Stage -Context $Context -WhatIf:$passWhatIf
+    }
+    catch {
+        Write-Host "  ERROR in $label : $_" -ForegroundColor Red
+        Add-StageError -Stage $Stage -Label $label -Message "$_"
+    }
 }
 
 function Invoke-StageExport {

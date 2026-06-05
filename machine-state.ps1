@@ -14,11 +14,15 @@ param(
 
     [string[]]$Script,
 
+    [string]$App,
+
     [switch]$ExportOnly,
 
     [switch]$BuildOnly,
 
-    [switch]$VerboseOutput
+    [switch]$VerboseOutput,
+
+    [switch]$Pause
 )
 
 Set-StrictMode -Version Latest
@@ -61,6 +65,18 @@ try {
             throw "None of the specified script(s) '$($Script -join ', ')' are configured for machine '$resolvedMachineName'."
         }
         Write-Host "Running subset: $($machineState.scripts -join ', ')"
+    }
+
+    # Run a single app script directly — skips merge/build/winget entirely
+    if ($App) {
+        $appScript = Join-Path $ScriptsRoot "apps\$App\apply.ps1"
+        if (-not (Test-Path -LiteralPath $appScript)) {
+            throw "App script not found: $appScript"
+        }
+        Write-Host ""
+        Write-Host "--- App : $App ---" -ForegroundColor Cyan
+        & $appScript -Context $context -WhatIf:$WhatIfPreference
+        return
     }
 
     switch ($Action) {
@@ -130,5 +146,8 @@ try {
 }
 catch {
     Write-Error $_
+    if ($Pause) { Read-Host "Press Enter to exit" }
     exit 1
 }
+
+if ($Pause) { Read-Host "Press Enter to exit" }
