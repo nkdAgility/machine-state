@@ -335,7 +335,7 @@ function Get-SetupTopicIds {
 
 function Merge-SetupTopicIds {
     param([AllowNull()][array]$Ids)
-    return @($Ids | Where-Object { $_ } | Sort-Object -Unique)
+    return @($Ids | Where-Object { $_ } | ForEach-Object { [string]$_ } | Sort-Object -Unique)
 }
 
 function Get-GitRepos {
