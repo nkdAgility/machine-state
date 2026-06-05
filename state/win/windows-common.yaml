@@ -241,9 +241,9 @@ winget:
     - name: Microsoft.DirectX
       required: true
       id: Microsoft.DirectX
-    - id: Microsoft.DotNet.DesktopRuntime.10
-      name: Microsoft.DotNet.DesktopRuntime.10
+    - name: Microsoft.DotNet.DesktopRuntime.10
       required: true
+      id: Microsoft.DotNet.DesktopRuntime.10
     - name: Microsoft.DotNet.DesktopRuntime.7
       required: true
       id: Microsoft.DotNet.DesktopRuntime.7

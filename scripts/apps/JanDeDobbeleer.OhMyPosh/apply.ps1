@@ -3,10 +3,6 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet("Export", "Build", "Execute")]
-    [string]$Stage,
-
-    [Parameter(Mandatory)]
     [pscustomobject]$Context
 )
 
@@ -15,16 +11,14 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "..\..\Setup-Engine.ps1")
 
-$configSource = Join-Path $PSScriptRoot "..\..\..\state\config\JanDeDobbeleer.OhMyPosh\ohmyposh.nkdagility.json"
-$configDest   = Join-Path $env:USERPROFILE ".config\ohmyposh\nkdagility.omp.json"
-$profileInit  = "oh-my-posh init pwsh --config `"$configDest`" | Invoke-Expression"
-
-# oh-my-posh must be on PATH for Execute to work. Winget installs it; PATH is refreshed
-# by Resolve-Winget.ps1 immediately before calling this script after a fresh install.
-if ($Stage -eq "Execute" -and -not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
     Write-Warning "oh-my-posh not found on PATH - skipping configuration"
     return
 }
+
+$configSource = Join-Path $Context.RepositoryRoot "state\config\JanDeDobbeleer.OhMyPosh\ohmyposh.nkdagility.json"
+$configDest   = Join-Path $env:USERPROFILE ".config\ohmyposh\nkdagility.omp.json"
+$profileInit  = "oh-my-posh init pwsh --config `"$configDest`" | Invoke-Expression"
 
 $catalog = @(
 
@@ -75,4 +69,4 @@ $catalog = @(
 
 )
 
-Invoke-SetupStage -Stage $Stage -Context $Context -Topic "ohmyposh" -Catalog $catalog
+Invoke-SetupStage -Stage Execute -Context $Context -Topic "ohmyposh" -Catalog $catalog

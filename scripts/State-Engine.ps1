@@ -663,6 +663,40 @@ function Invoke-StageExport {
     }
 }
 
+function Invoke-AppScript {
+    param(
+        [Parameter(Mandatory)][string]$ScriptPath,
+        [Parameter(Mandatory)][pscustomobject]$Context
+    )
+
+    $appId = Split-Path -Leaf (Split-Path -Parent $ScriptPath)
+    Write-Host ""
+    Write-Host "--- $appId : $(Split-Path -Leaf $ScriptPath) ---" -ForegroundColor Cyan
+    $passWhatIf = $WhatIfPreference
+    & $ScriptPath -Context $Context -WhatIf:$passWhatIf
+}
+
+function Invoke-StageCapture {
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Context
+    )
+
+    $appsRoot = Join-Path $Context.RepositoryRoot "scripts\apps"
+    if (-not (Test-Path -LiteralPath $appsRoot)) { return }
+
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor DarkCyan
+    Write-Host "  STAGE: Capture  [$($Context.MachineName)]" -ForegroundColor DarkCyan
+    Write-Host "========================================" -ForegroundColor DarkCyan
+
+    foreach ($appDir in Get-ChildItem -LiteralPath $appsRoot -Directory | Sort-Object Name) {
+        $script = Join-Path $appDir.FullName "capture.ps1"
+        if (Test-Path -LiteralPath $script) {
+            Invoke-AppScript -ScriptPath $script -Context $Context
+        }
+    }
+}
+
 function Invoke-StageIngest {
     param(
         [Parameter(Mandatory)]
@@ -903,6 +937,16 @@ function Invoke-StageBuild {
     foreach ($scriptName in @($MachineState.scripts)) {
         Invoke-ResolverScript -ScriptName $scriptName -Stage Build -Context $Context
     }
+
+    $appsRoot = Join-Path $Context.RepositoryRoot "scripts\apps"
+    if (Test-Path -LiteralPath $appsRoot) {
+        foreach ($appDir in Get-ChildItem -LiteralPath $appsRoot -Directory | Sort-Object Name) {
+            $script = Join-Path $appDir.FullName "build.ps1"
+            if (Test-Path -LiteralPath $script) {
+                Invoke-AppScript -ScriptPath $script -Context $Context
+            }
+        }
+    }
 }
 
 function Invoke-StageExecute {
@@ -920,6 +964,16 @@ function Invoke-StageExecute {
     Write-Host "========================================" -ForegroundColor DarkCyan
     foreach ($scriptName in @($MachineState.scripts)) {
         Invoke-ResolverScript -ScriptName $scriptName -Stage Execute -Context $Context
+    }
+
+    $appsRoot = Join-Path $Context.RepositoryRoot "scripts\apps"
+    if (Test-Path -LiteralPath $appsRoot) {
+        foreach ($appDir in Get-ChildItem -LiteralPath $appsRoot -Directory | Sort-Object Name) {
+            $script = Join-Path $appDir.FullName "apply.ps1"
+            if (Test-Path -LiteralPath $script) {
+                Invoke-AppScript -ScriptPath $script -Context $Context
+            }
+        }
     }
 }
 

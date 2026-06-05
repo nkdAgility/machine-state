@@ -68,7 +68,7 @@ try {
             Invoke-StageStatus -Context $context -MachineState $machineState
         }
         "capture" {
-            Invoke-StageExport -Context $context -MachineState $machineState
+            Invoke-StageCapture -Context $context
             if (-not $ExportOnly) {
                 Invoke-StageIngest -Context $context -MachineState $machineState
             }
