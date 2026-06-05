@@ -196,6 +196,10 @@ switch ($Stage) {
             $licensePath     = Join-Path $Context.ExportPath "winget.license-required.json"
             $exportLogPath   = Join-Path $Context.LogsPath  "winget.export.log"
 
+            # Committed path — written alongside the machine YAML so it is tracked in git
+            $machineStateDir      = Split-Path -Parent $Context.MachineStatePath
+            $committedUnavailable = Join-Path $machineStateDir "$($Context.MachineName).winget-sideloaded.json"
+
             New-DirectoryIfMissing -Path $Context.LogsPath
 
             # Capture both stdout and stderr so nothing leaks to the console
@@ -230,22 +234,26 @@ switch ($Stage) {
                     }
                 }
 
-                # Save unavailable packages
+                # Save unavailable/sideloaded packages — both working/ (transient) and state/machines/ (committed)
                 if ($unavailable.Count -gt 0) {
                     $unavailable | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $unavailablePath -Encoding UTF8
-                    Write-Host "$($unavailable.Count) sideloaded/unavailable package(s) logged to winget.unavailable.json"
+                    $unavailable | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $committedUnavailable -Encoding UTF8
+                    Write-Host "$($unavailable.Count) sideloaded/unavailable package(s) logged to $($Context.MachineName).winget-sideloaded.json"
                 }
-                elseif (Test-Path -LiteralPath $unavailablePath) {
-                    Remove-Item -LiteralPath $unavailablePath -Force
+                else {
+                    if (Test-Path -LiteralPath $unavailablePath)     { Remove-Item -LiteralPath $unavailablePath     -Force }
+                    if (Test-Path -LiteralPath $committedUnavailable) { Remove-Item -LiteralPath $committedUnavailable -Force }
                 }
 
-                # Save license-required packages
+                # Save license-required packages — both working/ (transient) and state/machines/ (committed)
                 if ($licenseRequired.Count -gt 0) {
                     $licenseRequired | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $licensePath -Encoding UTF8
-                    Write-Host "$($licenseRequired.Count) license-required package(s) logged to winget.license-required.json"
+                    $licenseRequired | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $committedLicense -Encoding UTF8
+                    Write-Host "$($licenseRequired.Count) license-required package(s) logged to $($Context.MachineName).winget-license-required.json"
                 }
-                elseif (Test-Path -LiteralPath $licensePath) {
-                    Remove-Item -LiteralPath $licensePath -Force
+                else {
+                    if (Test-Path -LiteralPath $licensePath)     { Remove-Item -LiteralPath $licensePath     -Force }
+                    if (Test-Path -LiteralPath $committedLicense) { Remove-Item -LiteralPath $committedLicense -Force }
                 }
 
                 if ($exitCode -ne 0) {
