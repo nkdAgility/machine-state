@@ -440,6 +440,8 @@ setup:
     - wsl
     - virtual-machine-platform
     - hyper-v
+    - office-insider-beta
+    - office-insider-behavior
   git:
     - long-paths
     - default-branch

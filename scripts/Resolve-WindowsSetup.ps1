@@ -135,6 +135,36 @@ $catalog = @(
         }
     }
 
+    @{
+        Id            = "office-insider-beta"
+        Name          = "Office Insider Beta channel (machine policy)"
+        RequiresAdmin = $true
+        Check         = {
+            $val = Get-ItemProperty "HKLM:\Software\Policies\Microsoft\office\16.0\common\officeupdate" -Name updatebranch -ErrorAction SilentlyContinue
+            $val -and $val.updatebranch -eq "BetaChannel"
+        }
+        Apply         = {
+            $path = "HKLM:\Software\Policies\Microsoft\office\16.0\common\officeupdate"
+            if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
+            Set-ItemProperty $path -Name updatebranch -Value "BetaChannel" -Type String
+        }
+    }
+
+    @{
+        Id            = "office-insider-behavior"
+        Name          = "Office Insider slab behavior (user policy)"
+        RequiresAdmin = $false
+        Check         = {
+            $val = Get-ItemProperty "HKCU:\Software\Policies\Microsoft\office\16.0\common" -Name insiderslabbehavior -ErrorAction SilentlyContinue
+            $val -and $val.insiderslabbehavior -eq 1
+        }
+        Apply         = {
+            $path = "HKCU:\Software\Policies\Microsoft\office\16.0\common"
+            if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
+            Set-ItemProperty $path -Name insiderslabbehavior -Value 1 -Type DWord
+        }
+    }
+
 )
 
 Invoke-SetupStage -Stage $Stage -Context $Context -Topic "windows" -Catalog $catalog

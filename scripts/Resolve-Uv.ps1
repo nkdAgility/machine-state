@@ -149,7 +149,7 @@ switch ($Stage) {
             Write-Host "$tag Installing $pkg"
 
             if ($PSCmdlet.ShouldProcess($pkg, "Install/upgrade uv tool")) {
-                & uv tool install --upgrade $pkg
+                & uv tool install --upgrade --force $pkg
                 if ($LASTEXITCODE -ne 0) {
                     Write-Warning "$tag Failed to install uv tool '$pkg' (exit code $LASTEXITCODE)"
                     $failed += $pkg

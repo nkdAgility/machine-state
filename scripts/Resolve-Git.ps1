@@ -160,6 +160,7 @@ switch ($Stage) {
         if (Test-Path -LiteralPath $(Join-Path $Context.ExportPath "git.export.json")) {
             $export = Get-Content -LiteralPath $(Join-Path $Context.ExportPath "git.export.json") -Raw | ConvertFrom-Json
             foreach ($found in @($export.repos)) {
+                if (-not $found.url) { continue }  # skip repos with no remote
                 if (-not $pulledUrls.Contains((Normalize-RepoUrl $found.url))) {
                     $folder = Split-Path -Leaf $found.path
                     $toPull += [ordered]@{ url = $found.url; path = $found.path; folder = $folder; managed = $false }
