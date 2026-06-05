@@ -13,26 +13,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Invoke-RefreshPath {
-    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" +
-                [System.Environment]::GetEnvironmentVariable("PATH", "User")
-}
-
-function Install-GitIfMissing {
-    if (Get-Command git -ErrorAction SilentlyContinue) { return }
-
-    Write-Host "git not found - installing via winget..."
-    & winget install --id Git.Git --accept-package-agreements --accept-source-agreements
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to install Git via winget (exit code $LASTEXITCODE)."
-    }
-
-    Invoke-RefreshPath
-
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        throw "git still not found on PATH after installing. Open a new terminal and re-run."
-    }
-}
+. (Join-Path $PSScriptRoot "Resolver-Common.ps1")
 
 
 function Get-RepoFolderName {
@@ -99,16 +80,9 @@ function Get-MergedGitConfig {
     return [pscustomobject]@{ CloneRoot = $cloneRoot; Repos = $repos }
 }
 
-function New-DirectoryIfMissing {
-    param([Parameter(Mandatory)][string]$Path)
-    if (-not (Test-Path -LiteralPath $Path)) {
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
-    }
-}
-
 switch ($Stage) {
     "Export" {
-        Install-GitIfMissing
+        Install-ToolIfMissing -Command git -WingetId Git.Git -DisplayName "Git"
 
         $config = Get-MergedGitConfig
         New-DirectoryIfMissing -Path $Context.ExportPath
@@ -209,7 +183,7 @@ switch ($Stage) {
     }
 
     "Execute" {
-        Install-GitIfMissing
+        Install-ToolIfMissing -Command git -WingetId Git.Git -DisplayName "Git"
 
         if (-not (Test-Path -LiteralPath $(Join-Path $Context.BuildPath "git.ops.json"))) {
             throw "git ops manifest not found at '$($(Join-Path $Context.BuildPath "git.ops.json"))'. Run build first."
