@@ -463,6 +463,9 @@ dotnet:
       - id: dotnet-format
         name: dotnet-format
         required: true
+      - id: GitVersion.Tool
+        name: GitVersion.Tool
+        required: true
 
 psmodules:
   packages:
