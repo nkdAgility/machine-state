@@ -223,11 +223,43 @@ switch ($Stage) {
             return
         }
 
-        if ($PSCmdlet.ShouldProcess("npm global packages", "Install/upgrade npm packages")) {
-            & npm install -g @($desiredPkgs)
-            if ($LASTEXITCODE -ne 0) {
-                throw "npm global install failed with exit code $LASTEXITCODE."
+        $total   = $desiredPkgs.Count
+        $current = 0
+        $failed  = @()
+
+        Write-Host ""
+        Write-Host "==> $total npm global package(s) to install/upgrade"
+        Write-Host ""
+
+        foreach ($pkg in $desiredPkgs) {
+            $current++
+            $tag = "[$current/$total]"
+            $pct = [int](($current - 1) / $total * 100)
+
+            Write-Progress -Activity "npm" -Status "$tag Installing $pkg" -PercentComplete $pct
+            Write-Host "$tag Installing $pkg"
+
+            if ($PSCmdlet.ShouldProcess($pkg, "npm install -g")) {
+                & npm install -g $pkg
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "$tag Failed to install npm package '$pkg' (exit code $LASTEXITCODE)"
+                    $failed += $pkg
+                }
+                else {
+                    Write-Host "$tag Done"
+                }
             }
+
+            Write-Host ""
+        }
+
+        Write-Progress -Activity "npm" -Completed
+
+        $succeeded = $total - $failed.Count
+        Write-Host "==> Completed: $succeeded/$total succeeded$(if ($failed.Count -gt 0) { ", $($failed.Count) failed: $($failed -join ', ')" })"
+
+        if ($failed.Count -gt 0) {
+            Write-Warning "npm: $($failed.Count) package(s) failed to install: $($failed -join ', ')"
         }
     }
 }

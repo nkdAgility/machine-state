@@ -194,13 +194,43 @@ switch ($Stage) {
             return
         }
 
+        $total   = $desiredPkgs.Count
+        $current = 0
+        $failed  = @()
+
+        Write-Host ""
+        Write-Host "==> $total uv tool(s) to install/upgrade"
+        Write-Host ""
+
         foreach ($pkg in $desiredPkgs) {
+            $current++
+            $tag = "[$current/$total]"
+            $pct = [int](($current - 1) / $total * 100)
+
+            Write-Progress -Activity "uv" -Status "$tag Installing $pkg" -PercentComplete $pct
+            Write-Host "$tag Installing $pkg"
+
             if ($PSCmdlet.ShouldProcess($pkg, "Install/upgrade uv tool")) {
                 & uv tool install --upgrade $pkg
                 if ($LASTEXITCODE -ne 0) {
-                    throw "uv tool install failed for '$pkg' with exit code $LASTEXITCODE."
+                    Write-Warning "$tag Failed to install uv tool '$pkg' (exit code $LASTEXITCODE)"
+                    $failed += $pkg
+                }
+                else {
+                    Write-Host "$tag Done"
                 }
             }
+
+            Write-Host ""
+        }
+
+        Write-Progress -Activity "uv" -Completed
+
+        $succeeded = $total - $failed.Count
+        Write-Host "==> Completed: $succeeded/$total succeeded$(if ($failed.Count -gt 0) { ", $($failed.Count) failed: $($failed -join ', ')" })"
+
+        if ($failed.Count -gt 0) {
+            Write-Warning "uv: $($failed.Count) tool(s) failed to install: $($failed -join ', ')"
         }
     }
 }
