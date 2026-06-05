@@ -42,6 +42,14 @@ function Get-RepoFolderName {
     return $name.Split("/")[-1]
 }
 
+function Normalize-RepoUrl {
+    param([Parameter(Mandatory)][string]$Url)
+
+    $u = $Url.Trim().TrimEnd("/")
+    if ($u.EndsWith(".git")) { $u = $u.Substring(0, $u.Length - 4) }
+    return $u.ToLowerInvariant()
+}
+
 function Expand-StatePath {
     param([Parameter(Mandatory)][string]$Path)
     return [System.Environment]::ExpandEnvironmentVariables($Path)
@@ -149,7 +157,7 @@ switch ($Stage) {
         $clonedUrls = @()
         if (Test-Path -LiteralPath $Context.GitExportPath) {
             $export = Get-Content -LiteralPath $Context.GitExportPath -Raw | ConvertFrom-Json
-            $clonedUrls = @($export.repos | ForEach-Object { $_.url.ToLowerInvariant() })
+            $clonedUrls = @($export.repos | ForEach-Object { Normalize-RepoUrl $_.url })
         }
 
         $toClone   = @()
@@ -163,9 +171,9 @@ switch ($Stage) {
             $folder    = if ($rawFolder) { [string]$rawFolder } else { Get-RepoFolderName $url }
             $path      = Join-Path $config.CloneRoot $folder
 
-            if ($clonedUrls -contains $url.ToLowerInvariant()) {
+            if ($clonedUrls -contains (Normalize-RepoUrl $url)) {
                 $toPull += [ordered]@{ url = $url; path = $path; folder = $folder; managed = $true }
-                $pulledUrls.Add($url) | Out-Null
+                $pulledUrls.Add((Normalize-RepoUrl $url)) | Out-Null
             }
             else {
                 $toClone += [ordered]@{ url = $url; path = $path; folder = $folder }
@@ -176,7 +184,7 @@ switch ($Stage) {
         if (Test-Path -LiteralPath $Context.GitExportPath) {
             $export = Get-Content -LiteralPath $Context.GitExportPath -Raw | ConvertFrom-Json
             foreach ($found in @($export.repos)) {
-                if (-not $pulledUrls.Contains($found.url)) {
+                if (-not $pulledUrls.Contains((Normalize-RepoUrl $found.url))) {
                     $folder = Split-Path -Leaf $found.path
                     $toPull += [ordered]@{ url = $found.url; path = $found.path; folder = $folder; managed = $false }
                     $pulledUrls.Add($found.url) | Out-Null
