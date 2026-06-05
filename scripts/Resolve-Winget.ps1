@@ -239,11 +239,15 @@ switch ($Stage) {
         # Write manual package list
         $manualPath = Join-Path $Context.BuildPath "winget.manual.json"
         if ($manualPackages.Count -gt 0) {
-            $manualPackages | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manualPath -Encoding UTF8
+            if ($PSCmdlet.ShouldProcess($manualPath, "Write winget manual packages list")) {
+                $manualPackages | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manualPath -Encoding UTF8
+            }
             Write-Host "$($manualPackages.Count) package(s) marked for manual installation"
         }
         elseif (Test-Path -LiteralPath $manualPath) {
-            Remove-Item -LiteralPath $manualPath -Force
+            if ($PSCmdlet.ShouldProcess($manualPath, "Remove stale winget manual packages list")) {
+                Remove-Item -LiteralPath $manualPath -Force
+            }
         }
 
         $wingetVersion = Get-WingetVersion
@@ -301,11 +305,15 @@ switch ($Stage) {
         }
 
         if ($upgrades.Count -gt 0) {
-            $upgrades | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
+            if ($PSCmdlet.ShouldProcess($upgradesPath, "Write winget upgrades manifest")) {
+                $upgrades | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
+            }
             Write-Host "$($upgrades.Count) package(s) have upgrades available"
         }
         elseif (Test-Path -LiteralPath $upgradesPath) {
-            Remove-Item -LiteralPath $upgradesPath -Force
+            if ($PSCmdlet.ShouldProcess($upgradesPath, "Remove stale winget upgrades manifest")) {
+                Remove-Item -LiteralPath $upgradesPath -Force
+            }
         }
     }
 

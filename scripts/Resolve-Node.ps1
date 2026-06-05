@@ -162,11 +162,15 @@ switch ($Stage) {
             }
 
             if ($upgrades.Count -gt 0) {
-                $upgrades | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
+                if ($PSCmdlet.ShouldProcess($upgradesPath, "Write npm upgrades manifest")) {
+                    $upgrades | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $upgradesPath -Encoding UTF8
+                }
                 Write-Host "$($upgrades.Count) npm package(s) have upgrades available"
             }
             elseif (Test-Path -LiteralPath $upgradesPath) {
-                Remove-Item -LiteralPath $upgradesPath -Force
+                if ($PSCmdlet.ShouldProcess($upgradesPath, "Remove stale npm upgrades manifest")) {
+                    Remove-Item -LiteralPath $upgradesPath -Force
+                }
             }
         }
         else {

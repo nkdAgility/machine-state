@@ -1,5 +1,9 @@
 #Requires -Version 7.0
 
+# -WhatIf behaviour:
+#   Merge always runs (needed to compute what would happen).
+#   Export and Build file writes are skipped (ShouldProcess-gated in resolver scripts).
+#   Execute shows what would be installed/changed without doing it.
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Position = 0)]
