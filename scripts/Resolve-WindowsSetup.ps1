@@ -101,8 +101,9 @@ $catalog = @(
         Name          = "WSL (Windows Subsystem for Linux)"
         RequiresAdmin = $true
         Check         = {
-            $f = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -ErrorAction SilentlyContinue
-            $f -and $f.State -eq "Enabled"
+            # Fast registry check - avoids slow Get-WindowsOptionalFeature -Online
+            (Get-Service LxssManager -ErrorAction SilentlyContinue)?.Status -eq 'Running' -or
+            (Test-Path "HKLM:\SYSTEM\CurrentControlSet\Services\LxssManager")
         }
         Apply         = {
             Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart | Out-Null
@@ -114,8 +115,9 @@ $catalog = @(
         Name          = "Virtual Machine Platform (WSL 2)"
         RequiresAdmin = $true
         Check         = {
-            $f = Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -ErrorAction SilentlyContinue
-            $f -and $f.State -eq "Enabled"
+            # Fast registry check
+            (Test-Path "HKLM:\SYSTEM\CurrentControlSet\Services\winhv") -and
+            (Get-Service winhv -ErrorAction SilentlyContinue)?.StartType -ne 'Disabled'
         }
         Apply         = {
             Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart | Out-Null
@@ -127,8 +129,9 @@ $catalog = @(
         Name          = "Hyper-V"
         RequiresAdmin = $true
         Check         = {
-            $f = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -ErrorAction SilentlyContinue
-            $f -and $f.State -eq "Enabled"
+            # Fast service check - vmms is the Hyper-V Virtual Machine Management service
+            (Get-Service vmms -ErrorAction SilentlyContinue)?.Status -eq 'Running' -or
+            (Get-Service vmms -ErrorAction SilentlyContinue)?.StartType -eq 'Automatic'
         }
         Apply         = {
             Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -NoRestart | Out-Null
