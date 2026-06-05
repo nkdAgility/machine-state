@@ -9,15 +9,22 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$StateConfigDir = Join-Path $Context.RepositoryRoot "state\config\Elgato.StreamDeck"
+. (Join-Path $PSScriptRoot "..\..\Resolver-Common.ps1")
 
-Write-Warning "  [stream-deck] *** MANUAL ACTION REQUIRED ***"
-Write-Warning "  [stream-deck] Stream Deck profiles cannot be exported automatically."
-Write-Warning "  [stream-deck] Export the backup through the Stream Deck application:"
-Write-Warning "  [stream-deck]   1. Open Stream Deck"
-Write-Warning "  [stream-deck]   2. Go to Settings > Profiles"
-Write-Warning "  [stream-deck]   3. Click the down arrow > Export backup..."
-Write-Warning "  [stream-deck]   4. Save to: $StateConfigDir\stream-deck-profiles.streamDeckProfilesBackup"
+$StateConfigDir = Join-Path $Context.RepositoryRoot "state\config\Elgato.StreamDeck"
+$BackupFile     = Join-Path $StateConfigDir "stream-deck-profiles.streamDeckProfilesBackup"
+
+Add-ManualAction -Context $Context -Category "stream-deck" `
+    -Description "Export Stream Deck profiles backup" `
+    -Reason "Stream Deck profiles cannot be exported automatically" `
+    -Steps @(
+        "Open Stream Deck",
+        "Go to Settings > Profiles",
+        "Click the down arrow > Export backup...",
+        "Save to: $BackupFile"
+    )
+
+Write-Host "  [stream-deck] Backup export registered in manual actions summary."
 
 if ($PSCmdlet.ShouldProcess($StateConfigDir, "Open backup destination in Explorer")) {
     Start-Process explorer.exe -ArgumentList "`"$StateConfigDir`""

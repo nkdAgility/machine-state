@@ -18,13 +18,17 @@ if (-not (Test-Path $BackupPath)) {
     return
 }
 
-Write-Warning "  [stream-deck] *** MANUAL ACTION REQUIRED ***"
-Write-Warning "  [stream-deck] Stream Deck profiles cannot be restored automatically."
-Write-Warning "  [stream-deck] Import the backup through the Stream Deck application:"
-Write-Warning "  [stream-deck]   1. Open Stream Deck"
-Write-Warning "  [stream-deck]   2. Go to Settings > Profiles"
-Write-Warning "  [stream-deck]   3. Click the down arrow > Import from backup..."
-Write-Warning "  [stream-deck]   4. Select: $BackupPath"
+Add-ManualAction -Context $Context -Category "stream-deck" `
+    -Description "Restore Stream Deck profiles from backup" `
+    -Reason "Stream Deck profiles cannot be restored automatically" `
+    -Steps @(
+        "Open Stream Deck",
+        "Go to Settings > Profiles",
+        "Click the down arrow > Import from backup...",
+        "Select: $BackupPath"
+    )
+
+Write-Host "  [stream-deck] Backup restore registered in manual actions summary."
 
 if ($PSCmdlet.ShouldProcess($BackupPath, "Open backup location in Explorer")) {
     Start-Process explorer.exe -ArgumentList "/select,`"$BackupPath`""

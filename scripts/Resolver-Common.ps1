@@ -59,7 +59,8 @@ function Add-ManualAction {
         [string]$Description,
 
         [string]$Command,
-        [string]$Reason
+        [string]$Reason,
+        [string[]]$Steps
     )
 
     $path = Join-Path $Context.BuildPath "manual-actions.json"
@@ -71,6 +72,7 @@ function Add-ManualAction {
     $entry = [ordered]@{ category = $Category; description = $Description }
     if ($Command) { $entry.command = $Command }
     if ($Reason)  { $entry.reason  = $Reason  }
+    if ($Steps -and $Steps.Count -gt 0) { $entry.steps = $Steps }
 
     $actions += [pscustomobject]$entry
     $actions | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $path -Encoding UTF8
@@ -99,12 +101,18 @@ function Write-ManualSummary {
         Write-Host ""
         Write-Host "  [$($group.Name.ToUpper())]" -ForegroundColor Cyan
         foreach ($item in $group.Group) {
-            Write-Host "  • $($item.description)"
-            if ($item.command) {
-                Write-Host "      $($item.command)" -ForegroundColor DarkGray
-            }
-            if ($item.reason) {
-                Write-Host "      Reason: $($item.reason)" -ForegroundColor DarkGray
+            Write-Host "  • $($item.PSObject.Properties['description']?.Value)"
+            $cmd   = $item.PSObject.Properties['command']?.Value
+            $why   = $item.PSObject.Properties['reason']?.Value
+            $steps = $item.PSObject.Properties['steps']?.Value
+            if ($cmd)   { Write-Host "      $cmd"            -ForegroundColor DarkGray }
+            if ($why)   { Write-Host "      Reason: $why"    -ForegroundColor DarkGray }
+            if ($steps) {
+                $stepNum = 1
+                foreach ($step in @($steps)) {
+                    Write-Host "      $stepNum. $step" -ForegroundColor DarkGray
+                    $stepNum++
+                }
             }
         }
     }

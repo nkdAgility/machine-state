@@ -90,9 +90,6 @@ winget:
     - name: Krisp
       required: true
       id: XP9D25XXG3SV5X
-    - name: Visual Studio Code
-      required: true
-      id: XP9KHM4BK9FZ7Q
     - name: TreeSize Free
       required: true
       id: XP9M26RSCLNT88
@@ -338,9 +335,6 @@ winget:
       name: Microsoft.VisualStudioCode
       required: true
       id: Microsoft.VisualStudioCode
-    - name: Microsoft.VisualStudioCode.Insiders
-      required: true
-      id: Microsoft.VisualStudioCode.Insiders
     - name: Microsoft.VSTOR
       required: true
       id: Microsoft.VSTOR

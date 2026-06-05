@@ -124,8 +124,9 @@ function Invoke-SetupStage {
                     Write-Host "$tag Done"
                     $applied += $setting.Name
                     # Fire optional OnApplied callback (e.g. to register reboot-required actions)
-                    if ($setting.OnApplied -and $addManualFn) {
-                        & $setting.OnApplied
+                    $onApplied = if ($setting -is [System.Collections.IDictionary]) { $setting['OnApplied'] } else { $setting.PSObject.Properties['OnApplied']?.Value }
+                    if ($onApplied -and $addManualFn) {
+                        & $onApplied
                     }
                 }
                 catch {

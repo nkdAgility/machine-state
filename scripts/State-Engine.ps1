@@ -691,12 +691,21 @@ function Invoke-StageCapture {
     Write-Host "  STAGE: Capture  [$($Context.MachineName)]" -ForegroundColor DarkCyan
     Write-Host "========================================" -ForegroundColor DarkCyan
 
+    # Clear manual-actions from any prior capture run
+    $manualActionsPath = Join-Path $Context.BuildPath "manual-actions.json"
+    if (Test-Path -LiteralPath $manualActionsPath) {
+        Remove-Item -LiteralPath $manualActionsPath -Force
+    }
+
     foreach ($appDir in Get-ChildItem -LiteralPath $appsRoot -Directory | Sort-Object Name) {
         $script = Join-Path $appDir.FullName "capture.ps1"
         if (Test-Path -LiteralPath $script) {
             Invoke-AppScript -ScriptPath $script -Context $Context
         }
     }
+
+    . (Join-Path $PSScriptRoot "Resolver-Common.ps1")
+    Write-ManualSummary -Context $Context
 }
 
 function Invoke-StageIngest {
