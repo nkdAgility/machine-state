@@ -14,8 +14,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 function Get-CloneRoot {
-    if (Test-Path -LiteralPath $Context.GitExportPath) {
-        $export = Get-Content -LiteralPath $Context.GitExportPath -Raw | ConvertFrom-Json
+    $gitExportPath = Join-Path $Context.ExportPath "git.export.json"
+    if (Test-Path -LiteralPath $gitExportPath) {
+        $export = Get-Content -LiteralPath $gitExportPath -Raw | ConvertFrom-Json
         if ($export.cloneRoot) { return $export.cloneRoot }
     }
     if (Test-Path -LiteralPath $Context.MergedStateJson) {
