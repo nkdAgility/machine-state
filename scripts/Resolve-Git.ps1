@@ -123,19 +123,34 @@ switch ($Stage) {
             $clonedUrls = @($export.repos | ForEach-Object { $_.url.ToLowerInvariant() })
         }
 
-        $toClone = @()
-        $toPull  = @()
+        $toClone   = @()
+        $toPull    = @()
+        $pulledUrls = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
+        # Desired repos: clone if missing, pull if present
         foreach ($repo in $config.Repos) {
             $url    = [string]$repo.url
             $folder = if ($repo.folder) { [string]$repo.folder } else { Get-RepoFolderName $url }
             $path   = Join-Path $config.CloneRoot $folder
 
             if ($clonedUrls -contains $url.ToLowerInvariant()) {
-                $toPull += [ordered]@{ url = $url; path = $path; folder = $folder }
+                $toPull += [ordered]@{ url = $url; path = $path; folder = $folder; managed = $true }
+                $pulledUrls.Add($url) | Out-Null
             }
             else {
                 $toClone += [ordered]@{ url = $url; path = $path; folder = $folder }
+            }
+        }
+
+        # Extra local repos not in desired state: pull only, never clone
+        if (Test-Path -LiteralPath $Context.GitExportPath) {
+            $export = Get-Content -LiteralPath $Context.GitExportPath -Raw | ConvertFrom-Json
+            foreach ($found in @($export.repos)) {
+                if (-not $pulledUrls.Contains($found.url)) {
+                    $folder = Split-Path -Leaf $found.path
+                    $toPull += [ordered]@{ url = $found.url; path = $found.path; folder = $folder; managed = $false }
+                    $pulledUrls.Add($found.url) | Out-Null
+                }
             }
         }
 
@@ -149,7 +164,8 @@ switch ($Stage) {
             $ops | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Context.GitOpsPath -Encoding UTF8
         }
 
-        Write-Host "git: $($toClone.Count) to clone, $($toPull.Count) to pull"
+        $extraCount = ($toPull | Where-Object { -not $_.managed }).Count
+        Write-Host "git: $($toClone.Count) to clone, $($toPull.Count) to pull ($extraCount local-only)"
     }
 
     "Execute" {
