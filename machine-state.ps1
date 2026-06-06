@@ -69,12 +69,14 @@ try {
 
     # Run a single app script directly — skips merge/build/winget entirely
     if ($App) {
-        $appScript = Join-Path $ScriptsRoot "apps\$App\apply.ps1"
+        $appDir    = Join-Path $ScriptsRoot "apps\$App"
+        $appScript = Join-Path $appDir "apply.ps1"
         if (-not (Test-Path -LiteralPath $appScript)) {
             throw "App script not found: $appScript"
         }
         Write-Host ""
         Write-Host "--- App : $App ---" -ForegroundColor Cyan
+        Invoke-AppDependencies -AppDir $appDir -Context $context -WhatIf:$WhatIfPreference
         & $appScript -Context $context -WhatIf:$WhatIfPreference
         return
     }

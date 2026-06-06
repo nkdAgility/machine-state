@@ -549,6 +549,51 @@ function Merge-MachineState {
     return [pscustomobject]$merged
 }
 
+function Invoke-AppDependencies {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory)][string]$AppDir,
+        [Parameter(Mandatory)][pscustomobject]$Context
+    )
+
+    $metaPath = Join-Path $AppDir "meta.yaml"
+    if (-not (Test-Path -LiteralPath $metaPath)) { return }
+
+    $meta = Read-YamlFile -Path $metaPath
+    if (-not $meta.winget -or $meta.winget.Count -eq 0) { return }
+
+    $anyInstalled = $false
+    foreach ($id in $meta.winget) {
+        & winget list --id $id --exact --accept-source-agreements 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  [dep] Installing $id ..." -ForegroundColor Yellow
+            if ($PSCmdlet.ShouldProcess($id, "winget install")) {
+                & winget install --id $id --source winget --accept-package-agreements --accept-source-agreements
+                $anyInstalled = $true
+            }
+            continue
+        }
+
+        # Already installed — check for upgrades
+        & winget upgrade --id $id --exact --include-unknown --accept-source-agreements 2>&1 | Out-Null
+        # 0 = upgrade available/applied; -1978335189 (0x8A150007) = already at latest
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  [dep] Upgrading $id ..." -ForegroundColor Yellow
+            if ($PSCmdlet.ShouldProcess($id, "winget upgrade")) {
+                & winget upgrade --id $id --source winget --accept-package-agreements --accept-source-agreements
+                $anyInstalled = $true
+            }
+        } else {
+            Write-Verbose "  [dep] $id is installed and up to date"
+        }
+    }
+
+    if ($anyInstalled) {
+        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" +
+                    [System.Environment]::GetEnvironmentVariable("PATH", "User")
+    }
+}
+
 function Get-MachineContext {
     param(
         [Parameter(Mandatory)]
