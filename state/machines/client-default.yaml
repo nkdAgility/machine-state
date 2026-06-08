@@ -12,4 +12,7 @@ state:
 scripts:
   - systems\WindowsSetup\Resolve.ps1
   - systems\Winget\Resolve.ps1
+  - systems\DotNet\Resolve.ps1
   - systems\PSModule\Resolve.ps1
+  - systems\GitRepos\Resolve.ps1
+  - systems\GitReposCleanup\Resolve.ps1

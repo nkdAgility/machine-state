@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-$BootstrapVersion = "1.1.0"
+$BootstrapVersion = "1.2.0"
 <#
 .SYNOPSIS
     Bootstrap a fresh Windows machine: install PowerShell 7, Git, clone machine-state, then apply.
@@ -39,11 +39,68 @@ function Invoke-Winget ([string]$Id, [string]$Name) {
     return $true
 }
 
-# ── 1. Verify winget is available ────────────────────────────────────────────
+# ── 1. Ensure winget is available ────────────────────────────────────────────
 Write-Step "Checking winget"
+
+function Install-WingetOnServer {
+    $os = Get-CimInstance Win32_OperatingSystem
+    $caption = $os.Caption
+
+    if ($caption -notmatch "Server") {
+        Write-Host "winget not found. Install 'App Installer' from the Microsoft Store, then re-run." -ForegroundColor Red
+        exit 1
+    }
+
+    if ($caption -match "2025") {
+        Write-Host "Windows Server 2025 detected — winget should be pre-installed but was not found on PATH." -ForegroundColor Red
+        Write-Host "Try: Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe" -ForegroundColor Yellow
+        exit 1
+    }
+
+    # Windows Server 2019 / 2022 — install winget and its dependencies manually
+    Write-Host "    Windows Server detected ($caption) — installing winget and dependencies..." -ForegroundColor Yellow
+
+    $tempDir = Join-Path $env:TEMP "winget-bootstrap"
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+
+    try {
+        Write-Host "    Installing VCLibs..."
+        Add-AppxPackage "https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx" -ErrorAction Stop
+
+        Write-Host "    Downloading Microsoft.UI.Xaml..."
+        $uiXamlZip = Join-Path $tempDir "microsoft.ui.xaml.2.8.6.zip"
+        Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.UI.Xaml/2.8.6" -OutFile $uiXamlZip -UseBasicParsing
+        Expand-Archive -Path $uiXamlZip -DestinationPath (Join-Path $tempDir "Microsoft.UI.Xaml.2.8.6") -Force
+        Add-AppxPackage (Join-Path $tempDir "Microsoft.UI.Xaml.2.8.6\tools\AppX\x64\Release\Microsoft.UI.Xaml.2.8.appx") -ErrorAction Stop
+
+        Write-Host "    Downloading winget..."
+        $wingetBundle = Join-Path $tempDir "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+        Invoke-WebRequest -Uri "https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -OutFile $wingetBundle -UseBasicParsing
+        Add-AppxPackage $wingetBundle -ErrorAction Stop
+
+        # Fix permissions and add to PATH for this session
+        $wingetDirs = Resolve-Path "C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe" -ErrorAction SilentlyContinue
+        if ($wingetDirs) {
+            $wingetDir = $wingetDirs[-1].Path
+            & takeown /F $wingetDir /R /A /D Y 2>$null | Out-Null
+            & icacls $wingetDir /grant "Administrators:F" /T 2>$null | Out-Null
+            $env:PATH += ";$wingetDir"
+        }
+    }
+    finally {
+        Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Host "winget installed but still not found on PATH. Open a new terminal and re-run." -ForegroundColor Yellow
+        exit 0
+    }
+
+    Write-Host "    winget installed successfully." -ForegroundColor Green
+}
+
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    Write-Host "winget not found. Install 'App Installer' from the Microsoft Store, then re-run." -ForegroundColor Red
-    exit 1
+    Install-WingetOnServer
 }
 
 # ── 2. Install PowerShell 7 ───────────────────────────────────────────────────

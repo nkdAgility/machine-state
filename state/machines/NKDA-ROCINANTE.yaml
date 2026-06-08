@@ -2,6 +2,9 @@ name: NKDA-ROCINANTE
 platform: win
 architecture: arm64
 
+git:
+  cloneRoot: "%USERPROFILE%\\source\\repos"
+
 state:
   - ../win/windows-common.yaml
   - ../win/windows-arm64.yaml
@@ -10,9 +13,14 @@ state:
   - ../common-base.yaml
 
 scripts:
+  - systems\WindowsSetup\Resolve.ps1
   - systems\Winget\Resolve.ps1
+  - systems\DotNet\Resolve.ps1
+  - systems\PSModule\Resolve.ps1
   - systems\Node\Resolve.ps1
   - systems\Uv\Resolve.ps1
+  - systems\GitRepos\Resolve.ps1
+  - systems\GitReposCleanup\Resolve.ps1
 
 exclusions:
   packages:
