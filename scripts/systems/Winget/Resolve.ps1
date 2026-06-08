@@ -358,8 +358,8 @@ switch ($Stage) {
         }
 
         $importDoc = Get-Content -LiteralPath (Join-Path $Context.BuildPath "winget.import.json") -Raw | ConvertFrom-Json
-        $desiredWinget = @($importDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget' } | ForEach-Object { $_.Packages.PackageIdentifier })
-        $desiredMsstore = @($importDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages.PackageIdentifier })
+        $desiredWinget  = @($importDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget'  } | ForEach-Object { $_.Packages } | Where-Object { $_ } | ForEach-Object { $_.PackageIdentifier })
+        $desiredMsstore = @($importDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages } | Where-Object { $_ } | ForEach-Object { $_.PackageIdentifier })
 
         if ($WhatIfPreference) {
             # Compare with export to show only what's actually missing
@@ -367,8 +367,8 @@ switch ($Stage) {
             $installedMsstore = @()
             if (Test-Path -LiteralPath (Join-Path $Context.ExportPath "winget.export.json")) {
                 $exportDoc = Get-Content -LiteralPath (Join-Path $Context.ExportPath "winget.export.json") -Raw | ConvertFrom-Json
-                $installedWinget = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget' } | ForEach-Object { $_.Packages.PackageIdentifier })
-                $installedMsstore = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages.PackageIdentifier })
+                $installedWinget  = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'winget'  } | ForEach-Object { $_.Packages } | Where-Object { $_ } | ForEach-Object { $_.PackageIdentifier })
+                $installedMsstore = @($exportDoc.Sources | Where-Object { $_.SourceDetails.Name -eq 'msstore' } | ForEach-Object { $_.Packages } | Where-Object { $_ } | ForEach-Object { $_.PackageIdentifier })
             }
             else {
                 Write-Warning "No export found at $((Join-Path $Context.ExportPath "winget.export.json")) - run 'capture' first for accurate diff. Showing all desired packages."
