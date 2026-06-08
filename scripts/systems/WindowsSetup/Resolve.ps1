@@ -192,6 +192,70 @@ $catalog = @(
         }
     }
 
+    @{
+        Id            = "defender-exclusions"
+        Name          = "Windows Defender exclusions for dev tooling caches"
+        RequiresAdmin = $true
+        Check         = {
+            $profile = $env:USERPROFILE
+            $expected = @(
+                "$profile\.agents",
+                "$profile\.cache",
+                "$profile\.copilot",
+                "$profile\.ollama\models",
+                "$profile\.vscode",
+                "$profile\.vscode-insiders",
+                "$profile\.nuget\packages",
+                "$profile\AppData\Local\npm-cache",
+                "$profile\AppData\Local\pnpm",
+                "$profile\AppData\Local\Yarn",
+                "$profile\AppData\Local\Temp\yarn-cache",
+                "$profile\AppData\Local\pip\Cache",
+                "$profile\.conda",
+                "$profile\.virtualenvs",
+                "$profile\AppData\Local\JetBrains",
+                "$profile\AppData\Roaming\JetBrains",
+                "$profile\AppData\Local\Docker",
+                "$profile\AppData\Roaming\Docker",
+                "$profile\.aitk",
+                "$profile\source"
+            )
+            $current = (Get-MpPreference).ExclusionPath ?? @()
+            $missing = $expected | Where-Object { $_ -notin $current }
+            $missing.Count -eq 0
+        }
+        Apply         = {
+            $profile = $env:USERPROFILE
+            $desired = @(
+                "$profile\.agents",
+                "$profile\.cache",
+                "$profile\.copilot",
+                "$profile\.ollama\models",
+                "$profile\.vscode",
+                "$profile\.vscode-insiders",
+                "$profile\.nuget\packages",
+                "$profile\AppData\Local\npm-cache",
+                "$profile\AppData\Local\pnpm",
+                "$profile\AppData\Local\Yarn",
+                "$profile\AppData\Local\Temp\yarn-cache",
+                "$profile\AppData\Local\pip\Cache",
+                "$profile\.conda",
+                "$profile\.virtualenvs",
+                "$profile\AppData\Local\JetBrains",
+                "$profile\AppData\Roaming\JetBrains",
+                "$profile\AppData\Local\Docker",
+                "$profile\AppData\Roaming\Docker",
+                "$profile\.aitk",
+                "$profile\source"
+            )
+            $current = (Get-MpPreference).ExclusionPath ?? @()
+            $toAdd = $desired | Where-Object { $_ -notin $current }
+            foreach ($path in $toAdd) {
+                Add-MpPreference -ExclusionPath $path
+            }
+        }
+    }
+
 )
 
 Invoke-SetupStage -Stage $Stage -Context $Context -Topic "windows" -Catalog $catalog

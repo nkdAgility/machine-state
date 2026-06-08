@@ -21,17 +21,33 @@ Given the same input YAML, the output is always the same.
 | NKDA-BEHEMOTH | Windows x64 | Intel i9, NVIDIA GPU |
 | NKDA-ROCINANTE | Windows ARM64 | Snapdragon Surface, 64 GB RAM |
 
-## How to Run
+---
 
-On a fresh machine or from `cmd.exe`, use the bootstrap wrapper:
+## Fresh Machine Bootstrap
 
-```cmd
-machine-state.cmd sync
+On a brand-new Windows 10/11 machine — nothing installed, repo not cloned — open an
+**elevated PowerShell prompt** and run:
+
+```powershell
+irm https://raw.githubusercontent.com/nkdAgility/machine-state/main/bootstrap.ps1 | iex
 ```
 
-This installs PowerShell 7+ and the YAML module if missing, then hands off to the script.
+This single command will:
 
-If PowerShell 7+ is already available:
+1. Verify `winget` is available (ships with Windows 11; install **App Installer** from the Store on Windows 10)
+2. Install **PowerShell 7** via winget
+3. Install **Git** via winget
+4. Clone this repo to `%USERPROFILE%\source\repos\machine-state`
+5. Hand off to `machine-state.ps1 apply` under PowerShell 7
+
+If the repo is already cloned it pulls the latest instead of re-cloning. Safe to re-run at any time.
+
+> **Tip — WhatIf:** append `-WhatIf` to the final `pwsh` call inside `bootstrap.ps1` if you want
+> to preview what would be installed without making any changes.
+
+---
+
+## How to Run (repo already cloned)
 
 ```powershell
 ./machine-state.ps1 sync           # Capture current state, then apply desired state

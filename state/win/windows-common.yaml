@@ -46,6 +46,7 @@ setup:
   - office-insider-beta
   - office-insider-behavior
   - sudo
+  - defender-exclusions
 node:
   packages:
     npm:
