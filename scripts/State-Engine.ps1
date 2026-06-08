@@ -1049,13 +1049,36 @@ function Invoke-StageExecute {
         Invoke-ResolverScript -ScriptName $scriptName -Stage Execute -Context $Context
     }
 
+    # Build the set of desired package IDs from the merged state so apply.ps1
+    # only runs for packages that are actually wanted on this machine.
+    $desiredAppIds = [System.Collections.Generic.HashSet[string]]([System.StringComparer]::OrdinalIgnoreCase)
+    if (Test-Path -LiteralPath $Context.MergedStateJson) {
+        $mergedForApps = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
+        foreach ($src in @("winget", "msstore")) {
+            $srcPackages = $mergedForApps.winget?.packages?.$src
+            if ($srcPackages) {
+                foreach ($pkg in @($srcPackages)) {
+                    $pkgId = $pkg.id
+                    if ($pkgId) { [void]$desiredAppIds.Add([string]$pkgId) }
+                }
+            }
+        }
+    }
+
     $appsRoot = Join-Path $Context.RepositoryRoot "scripts\apps"
     if (Test-Path -LiteralPath $appsRoot) {
         foreach ($appDir in Get-ChildItem -LiteralPath $appsRoot -Directory | Sort-Object Name) {
             $script = Join-Path $appDir.FullName "apply.ps1"
-            if (Test-Path -LiteralPath $script) {
-                Invoke-AppScript -ScriptPath $script -Context $Context
+            if (-not (Test-Path -LiteralPath $script)) { continue }
+
+            # Skip apps not desired on this machine (prevents e.g. StreamDeck or
+            # Nvidia.ArSDK from running on a client workstation that never asked for them).
+            if ($desiredAppIds.Count -gt 0 -and -not $desiredAppIds.Contains($appDir.Name)) {
+                Write-Verbose "Skipping apply.ps1 for '$($appDir.Name)' — not in desired packages for this machine"
+                continue
             }
+
+            Invoke-AppScript -ScriptPath $script -Context $Context
         }
     }
 

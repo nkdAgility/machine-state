@@ -374,6 +374,9 @@ winget:
       - id: NSSM.NSSM
         name: NSSM.NSSM
         required: true
+      - id: Nvidia.ArSDK
+        name: Nvidia.ArSDK
+        required: true
       - id: Nvidia.VideoEffectsSDK.20xx-Turing
         name: Nvidia.VideoEffectsSDK.20xx-Turing
         required: true
