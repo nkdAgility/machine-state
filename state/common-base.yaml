@@ -1,3 +1,9 @@
+scripts:
+  - systems\DotNet\Resolve.ps1
+  - systems\PSModule\Resolve.ps1
+  - systems\GitRepos\Resolve.ps1
+  - systems\GitReposCleanup\Resolve.ps1
+
 dotnet:
   packages:
     tools:

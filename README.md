@@ -25,7 +25,7 @@ Given the same input YAML, the output is always the same.
 
 ## Fresh Machine Bootstrap
 
-On a brand-new Windows 10/11 machine — nothing installed, repo not cloned — open an
+On a brand-new Windows machine — nothing installed, repo not cloned — open an
 **elevated PowerShell prompt** and run:
 
 ```powershell
@@ -34,11 +34,15 @@ irm https://raw.githubusercontent.com/nkdAgility/machine-state/main/bootstrap.ps
 
 This single command will:
 
-1. Verify `winget` is available (ships with Windows 11; install **App Installer** from the Store on Windows 10)
+1. Ensure `winget` is available:
+   - **Windows 11 / Windows Server 2025** — ships pre-installed; verified on PATH.
+   - **Windows Server 2019 / 2022** — automatically installs VCLibs, Microsoft.UI.Xaml, and the winget msixbundle, then fixes PATH.
+   - **Windows 10 client** — prompts to install **App Installer** from the Microsoft Store if winget is absent.
 2. Install **PowerShell 7** via winget
 3. Install **Git** via winget
 4. Clone this repo to `%USERPROFILE%\source\repos\machine-state`
-5. Hand off to `machine-state.ps1 apply` under PowerShell 7
+5. Install `powershell-yaml` under pwsh 7
+6. Hand off to `machine-state.ps1 apply` under PowerShell 7
 
 If the repo is already cloned it pulls the latest instead of re-cloning. Safe to re-run at any time.
 
@@ -68,16 +72,14 @@ Primary state is everything the machine needs *installed*. It lives in YAML unde
 
 | Concern | Where it lives |
 |---------|----------------|
-| Winget packages (universal) | `state/win/windows-base.yaml` |
-| Winget packages (personal) | `state/win/windows-common.yaml`, `state/machines/<Name>.yaml` |
+| Winget packages (base) | `state/win/windows-base.yaml` |
+| Winget packages (common/personal) | `state/win/windows-common.yaml`, `state/machines/<Name>.yaml` |
 | Node / npm globals | `state/win/windows-common.yaml` |
 | Python / uv tools | `state/win/windows-common.yaml` |
-| .NET global tools | `state/common-personal.yaml` |
-| PowerShell modules (engine) | `state/common-base.yaml` |
-| PowerShell modules (personal) | `state/common-personal.yaml` |
-| Git repositories | `state/common-personal.yaml` |
-| Windows OS setup (universal) | `state/win/windows-base.yaml` (`setup.windows`) |
-| Windows OS setup (personal) | `state/win/windows-common.yaml` (`setup.windows`) |
+| .NET global tools | `state/common-base.yaml`, `state/common-personal.yaml` |
+| PowerShell modules | `state/common-base.yaml`, `state/common-personal.yaml` |
+| Git repositories | `state/common-base.yaml`, `state/common-personal.yaml` |
+| Windows OS setup | `state/win/windows-base.yaml` (`setup.windows`) |
 | Git global config | `state/common-base.yaml` (`setup.git`) |
 
 The engine merges these, deduplicates by `id`, sorts deterministically, and writes

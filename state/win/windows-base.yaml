@@ -1,5 +1,9 @@
 platform: win
 
+scripts:
+  - systems\WindowsSetup\Resolve.ps1
+  - systems\Winget\Resolve.ps1
+
 exclusions:
   packages:
     winget:

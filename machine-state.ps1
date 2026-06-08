@@ -67,6 +67,7 @@ try {
     $resolvedMachineName = Resolve-MachineName -RequestedMachineName $MachineName
     $machineStatePath = Get-MachineStatePath -ResolvedMachineName $resolvedMachineName
     $machineState = Read-YamlFile -Path $machineStatePath
+    $machineState['scripts'] = @(Get-MergedScripts -MachineStatePath $machineStatePath -MachineStateData $machineState)
     $context = Get-MachineContext -ResolvedMachineName $resolvedMachineName -MachineStatePath $machineStatePath -MachineStateData $machineState
 
     # Client machines are build/apply only — capture would write personal state back to the repo

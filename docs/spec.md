@@ -43,15 +43,17 @@ Supported machines:
 
 ## State File Routing
 
-Use the correct file based on scope. **If it is cross-platform and not machine-specific, it goes in `state/common.yaml`.**
+Use the correct file based on scope. **If it is cross-platform and not machine-specific, it goes in `state/common-base.yaml`.**
 
 | Scope | File | What belongs here |
 |-------|------|-------------------|
-| **Cross-platform, every machine** | `state/common.yaml` | dotnet global tools, PS modules, git repos, `setup.git` IDs |
-| **Windows, every Windows machine** | `state/win/windows-common.yaml` | winget packages, npm globals, uv tools, `setup.windows` IDs |
+| **Cross-platform, every machine** | `state/common-base.yaml` | dotnet global tools, PS modules, git repos, `setup.git` IDs |
+| **Personal cross-platform** | `state/common-personal.yaml` | personal dotnet tools, personal PS modules |
+| **Windows base (every Windows machine)** | `state/win/windows-base.yaml` | core winget packages, `setup.windows` IDs |
+| **Windows common (every Windows machine)** | `state/win/windows-common.yaml` | npm globals, uv tools, additional winget packages |
 | **Windows x64 only** | `state/win/windows-x64.yaml` | x64-specific winget packages |
 | **Windows ARM64 only** | `state/win/windows-arm64.yaml` | ARM64-specific winget packages |
-| **One specific machine** | `state/machines/<Name>.yaml` | machine-unique packages, `git.cloneRoot`, scripts list |
+| **One specific machine** | `state/machines/<Name>.yaml` | machine-unique packages, `git.cloneRoot` |
 
 ---
 
@@ -62,12 +64,15 @@ machine-state/
   machine-state.ps1
 
   state/
-    common.yaml               ← cross-platform, every machine
+    common-base.yaml          ← cross-platform, every machine
+    common-personal.yaml      ← personal cross-platform state
     machines/
       NKDA-BEHEMOTH.yaml
       NKDA-ROCINANTE.yaml
+      client-default.yaml     ← fallback for unknown machines
     win/
-      windows-common.yaml     ← all Windows machines
+      windows-base.yaml       ← every Windows machine (base packages + OS setup)
+      windows-common.yaml     ← every Windows machine (npm, uv, additional packages)
       windows-x64.yaml        ← x64 only
       windows-arm64.yaml      ← ARM64 only
     config/
@@ -227,19 +232,14 @@ git:
   cloneRoot: "%USERPROFILE%\\source\\repos"
 
 state:
-  - ../win/windows-common.yaml
+  - ../win/windows-base.yaml
   - ../win/windows-x64.yaml
-  - ../common.yaml
+  - ../win/windows-common.yaml
+  - ../common-personal.yaml
+  - ../common-base.yaml
 
-scripts:
-  - systems\WindowsSetup\Resolve.ps1
-  - systems\Winget\Resolve.ps1
-  - systems\DotNet\Resolve.ps1
-  - systems\PSModule\Resolve.ps1
-  - systems\Node\Resolve.ps1
-  - systems\Uv\Resolve.ps1
-  - systems\GitRepos\Resolve.ps1
-  - systems\GitReposCleanup\Resolve.ps1
+# scripts: omitted — resolver scripts are declared in the shared state files above.
+# Add scripts: here only for resolvers not covered by any referenced shared state file.
 
 exclusions:
   packages:
@@ -253,14 +253,6 @@ winget:
         name: Nvidia.CUDA
         required: true
     msstore: []
-
-setup:
-  windows:
-    - long-paths
-    - execution-policy
-  git:
-    - default-branch
-    - autocrlf
 ```
 
 Key fields:
@@ -268,16 +260,21 @@ Key fields:
 - `name`, `platform`, `architecture` — required; used in context and validation.
 - `git.cloneRoot` — machine-specific root path for repository clones; supports `%ENVVAR%` expansion. Only read from the machine YAML (never from shared state).
 - `state` — ordered list of relative paths to shared state YAML files, resolved relative to the machine file's directory.
-- `scripts` — ordered list of resolver script filenames under `scripts/`.
+- `scripts` — **optional**. Resolver scripts are normally declared in the shared state files that own the data they process. Only add `scripts:` to a machine YAML for resolvers not covered by any referenced shared state file.
 - `exclusions.packages.winget/msstore` — package IDs that must never appear in desired state, even if present in shared files.
 - `winget.packages.winget/msstore` — machine-specific package lists.
-- `setup.windows/git` — list of catalog entry IDs to apply for each setup topic.
 
 ### Shared State YAML
 
-Shared files (e.g. `state/win/windows-common.yaml`, `state/common.yaml`) may contain any combination of:
+Shared files declare the resolver scripts they need alongside the data those resolvers process. This means adding a new section to a shared file automatically brings in the correct resolver for every machine that references it — no machine YAML changes required.
+
+Shared files (e.g. `state/win/windows-base.yaml`, `state/common-base.yaml`) may contain any combination of:
 
 ```yaml
+scripts:
+  - systems\WindowsSetup\Resolve.ps1   # declare which resolvers this file needs
+  - systems\Winget\Resolve.ps1
+
 winget:
   packages:
     winget:
@@ -694,17 +691,20 @@ Catalog IDs:
 1. Reads the machine YAML file.
 2. For each path in `machine.state[]` (resolved relative to the machine file's directory):
    - Reads the shared YAML file.
-   - Accumulates packages, repos, exclusions, and setup IDs.
-3. Accumulates the machine file's own inline packages, repos, exclusions, and setup IDs.
+   - Accumulates scripts, packages, repos, exclusions, and setup IDs.
+3. Accumulates the machine file's own inline scripts, packages, repos, exclusions, and setup IDs.
 
 Merging rules per section:
 
 | Section | Key | Rule |
 |---|---|---|
+| `scripts` | script path | Collected from all state files and the machine file; deduplicated; sorted by canonical order (see below); unknown scripts appended after in first-encountered order. |
 | `winget.packages.winget` | `id` | Deduplicate by id; last occurrence wins; sorted by id. |
 | `winget.packages.msstore` | `id` | Same. |
 | `node.packages.npm` | `id` | Same. |
 | `uv.packages.uv` | `id` | Same. |
+| `dotnet.packages.tools` | `id` | Same. |
+| `psmodules.packages.psgallery` | `id` | Same. |
 | `git.repos` | `url` (normalised) | Deduplicate by normalised URL; last occurrence wins; sorted by normalised URL. |
 | `setup.windows` | ID string | Deduplicated and sorted. |
 | `setup.git` | ID string | Deduplicated and sorted. |
@@ -713,10 +713,29 @@ Merging rules per section:
 
 Exclusion application: after all packages are merged, any package whose `id` appears in the combined exclusion list for that source is removed from the merged package list.
 
+### Canonical Script Order
+
+`Merge-Scripts` in `State-Engine.ps1` enforces this execution order regardless of the order scripts appear in state files:
+
+1. `systems\WindowsSetup\Resolve.ps1`
+2. `systems\Winget\Resolve.ps1`
+3. `systems\DotNet\Resolve.ps1`
+4. `systems\PSModule\Resolve.ps1`
+5. `systems\Node\Resolve.ps1`
+6. `systems\Uv\Resolve.ps1`
+7. `systems\GitRepos\Resolve.ps1`
+8. `systems\GitReposCleanup\Resolve.ps1`
+
+Scripts not in this list are appended after in first-encountered order.
+
+### Script Resolution
+
+`Get-MergedScripts` is called in `machine-state.ps1` immediately after reading the machine YAML. The resolved script list is written back onto `$machineState.scripts` before any stage function runs. This means the `-Script` filter, `Invoke-StageStatus`, and all stage functions operate against the full merged list without requiring the merge JSON to exist yet.
+
 Output written to:
 
-- `working/<MachineName>/merge/machine-state.merged.yaml`
-- `working/<MachineName>/merge/machine-state.merged.json`
+- `working/<MachineName>/machine-state.yaml`
+- `working/<MachineName>/machine-state.json`
 
 ---
 
@@ -824,7 +843,7 @@ Checks performed:
 1. At least one machine YAML file exists.
 2. Each machine YAML has `name`, `platform`, and `architecture`.
 3. Each path in `state[]` resolves to an existing file.
-4. Each script name in `scripts[]` resolves to an existing file under `scripts/`.
+4. Each script name in the **merged** script list (collected from all referenced state files plus the machine file) resolves to an existing file under `scripts/`.
 5. Exclusion entries are non-empty strings.
 6. Machine-local package IDs are unique across all machine files (duplicates must move to shared state).
 7. Machine-local exclusion IDs are unique across all machine files.

@@ -110,6 +110,62 @@ function Read-YamlFile {
     return $yamlText | ConvertFrom-Yaml
 }
 
+# Canonical resolver execution order — scripts collected from state files are sorted by this list.
+# Scripts not in this list are appended after, in the order first encountered.
+$script:CanonicalScriptOrder = @(
+    'systems\WindowsSetup\Resolve.ps1',
+    'systems\Winget\Resolve.ps1',
+    'systems\DotNet\Resolve.ps1',
+    'systems\PSModule\Resolve.ps1',
+    'systems\Node\Resolve.ps1',
+    'systems\Uv\Resolve.ps1',
+    'systems\GitRepos\Resolve.ps1',
+    'systems\GitReposCleanup\Resolve.ps1'
+)
+
+function Get-StateScripts {
+    param([AllowNull()][object]$StateObject)
+    if ($null -eq $StateObject) { return @() }
+    $scriptsNode = Get-ObjectValue -Object $StateObject -Name "scripts"
+    if (-not $scriptsNode) { return @() }
+    return @($scriptsNode | Where-Object { $_ } | ForEach-Object { [string]$_ })
+}
+
+function Merge-Scripts {
+    param([AllowNull()][array]$Scripts)
+    $seen = [System.Collections.Generic.HashSet[string]]([System.StringComparer]::OrdinalIgnoreCase)
+    $result = [System.Collections.Generic.List[string]]::new()
+    foreach ($s in $script:CanonicalScriptOrder) {
+        if (($Scripts -contains $s) -and $seen.Add($s)) {
+            $result.Add($s)
+        }
+    }
+    foreach ($s in @($Scripts)) {
+        if ($s -and $seen.Add($s)) {
+            $result.Add($s)
+        }
+    }
+    return [string[]]$result
+}
+
+function Get-MergedScripts {
+    param(
+        [Parameter(Mandatory)][string]$MachineStatePath,
+        [object]$MachineStateData = $null
+    )
+    $machineState = if ($null -ne $MachineStateData) { $MachineStateData } else { Read-YamlFile -Path $MachineStatePath }
+    $all = @()
+    foreach ($relativePath in @($machineState.state)) {
+        $resolvedPath = Join-Path (Split-Path -Parent $MachineStatePath) $relativePath
+        if (Test-Path -LiteralPath $resolvedPath) {
+            $sharedState = Read-YamlFile -Path $resolvedPath
+            $all += @(Get-StateScripts -StateObject $sharedState)
+        }
+    }
+    $all += @(Get-StateScripts -StateObject $machineState)
+    return @(Merge-Scripts -Scripts $all)
+}
+
 function Get-ObjectValue {
     param(
         [Parameter(Mandatory)]
@@ -489,7 +545,7 @@ function Merge-MachineState {
         platform     = [string]$machineState.platform
         architecture = [string]$machineState.architecture
         state        = @($machineState.state)
-        scripts      = @($machineState.scripts)
+        scripts      = @(Get-MergedScripts -MachineStatePath $MachineStatePath -MachineStateData $machineState)
         exclusions   = [ordered]@{
             packages = [ordered]@{
                 winget     = [string[]]$wingetExclusions
@@ -1275,7 +1331,8 @@ function Invoke-StageValidate {
             $resolvedStateFiles += $resolvedPath
         }
 
-        foreach ($scriptName in @($machineState.scripts)) {
+        $mergedScripts = @(Get-MergedScripts -MachineStatePath $machinePath -MachineStateData $machineState)
+        foreach ($scriptName in $mergedScripts) {
             $scriptPath = Join-Path $ScriptsRoot $scriptName
             if (-not (Test-Path -LiteralPath $scriptPath)) {
                 throw "Resolver script not found for machine '$machine': $scriptPath"

@@ -19,13 +19,43 @@ This is the most important rule. Use the correct file based on scope:
 
 | Scope | File | Examples |
 |-------|------|---------|
-| **Cross-platform, every machine** | `state/common.yaml` | git repos, dotnet tools, PS modules, `setup.git` IDs |
-| **Windows, every Windows machine** | `state/win/windows-common.yaml` | winget packages, npm globals, uv tools, `setup.windows` IDs |
+| **Cross-platform, every machine** | `state/common-base.yaml` | git repos, dotnet tools, PS modules, `setup.git` IDs |
+| **Personal / non-base cross-platform** | `state/common-personal.yaml` | personal dotnet tools, PS modules |
+| **Windows base (every Windows machine)** | `state/win/windows-base.yaml` | base winget packages, `setup.windows` IDs |
+| **Windows common (every Windows machine)** | `state/win/windows-common.yaml` | npm globals, uv tools, additional winget packages |
 | **Windows x64 only** | `state/win/windows-x64.yaml` | x64-specific winget packages |
 | **Windows ARM64 only** | `state/win/windows-arm64.yaml` | ARM64-specific winget packages |
-| **One specific machine** | `state/machines/<Name>.yaml` | machine-unique packages, `git.cloneRoot`, per-machine scripts |
+| **One specific machine** | `state/machines/<Name>.yaml` | machine-unique packages, `git.cloneRoot` |
 
-**If it is cross-platform and not machine-specific, it goes in `state/common.yaml`.**
+**If it is cross-platform and not machine-specific, it goes in `state/common-base.yaml`.**
+
+---
+
+## Resolver Scripts — Owned by State Files
+
+Resolver scripts are **declared in the state file that owns the data they process**.
+The engine collects scripts from all referenced state files, deduplicates them, and
+runs them in canonical order. Machine YAML files do **not** list scripts unless they
+have genuinely machine-specific resolvers.
+
+| State file | Scripts it declares | Why |
+|------------|--------------------|----|
+| `state/win/windows-base.yaml` | `WindowsSetup`, `Winget` | owns `setup.windows` and base winget packages |
+| `state/win/windows-common.yaml` | `Node`, `Uv` | owns `node` and `uv` sections |
+| `state/common-base.yaml` | `DotNet`, `PSModule`, `GitRepos`, `GitReposCleanup` | owns `dotnet`, `psmodules`, `git.repos` sections |
+
+**Canonical execution order** (enforced by `Merge-Scripts` in `State-Engine.ps1`):
+
+1. `systems\WindowsSetup\Resolve.ps1`
+2. `systems\Winget\Resolve.ps1`
+3. `systems\DotNet\Resolve.ps1`
+4. `systems\PSModule\Resolve.ps1`
+5. `systems\Node\Resolve.ps1`
+6. `systems\Uv\Resolve.ps1`
+7. `systems\GitRepos\Resolve.ps1`
+8. `systems\GitReposCleanup\Resolve.ps1`
+
+Scripts not in this list are appended after in first-encountered order.
 
 ---
 
@@ -39,14 +69,14 @@ merge, build, and execute pipeline:
 
 | Concern | Canonical YAML location | Resolver script |
 |---------|------------------------|-----------------|
-| Winget packages | `state/win/*.yaml`, `state/machines/<Name>.yaml` | `systems/Winget/Resolve.ps1` |
+| Winget packages | `state/win/windows-base.yaml`, `state/win/windows-common.yaml`, `state/win/windows-x64.yaml`, `state/win/windows-arm64.yaml`, `state/machines/<Name>.yaml` | `systems/Winget/Resolve.ps1` |
 | Node / npm globals | `state/win/windows-common.yaml` | `systems/Node/Resolve.ps1` |
 | Python / uv tools | `state/win/windows-common.yaml` | `systems/Uv/Resolve.ps1` |
-| .NET global tools | `state/common.yaml` | `systems/DotNet/Resolve.ps1` |
-| PowerShell modules | `state/common.yaml` | `systems/PSModule/Resolve.ps1` |
-| Git repositories | `state/common.yaml` | `systems/GitRepos/Resolve.ps1` |
-| Windows OS setup | `state/win/windows-common.yaml` (`setup.windows`) | `systems/WindowsSetup/Resolve.ps1` |
-| Git app config | `state/common.yaml` (`setup.git`) | `Resolve-GitSetup.ps1` |
+| .NET global tools | `state/common-base.yaml` | `systems/DotNet/Resolve.ps1` |
+| PowerShell modules | `state/common-base.yaml` | `systems/PSModule/Resolve.ps1` |
+| Git repositories | `state/common-base.yaml` | `systems/GitRepos/Resolve.ps1` |
+| Windows OS setup | `state/win/windows-base.yaml` (`setup.windows`) | `systems/WindowsSetup/Resolve.ps1` |
+| Git app config | `state/common-base.yaml` (`setup.git`) | `scripts/apps/Git.Git/apply.ps1` |
 
 **Do not put primary state in `scripts/apps/`.** It belongs in `state/` so the
 engine can merge, deduplicate, and validate it.
@@ -115,9 +145,14 @@ winget package an app resolver belongs to.
 
 ```
 state/
-  common.yaml           ← cross-platform, every machine (dotnet tools, PS modules, git repos, setup.git)
-  machines/             ← one file per named workstation
-  win/                  ← Windows platform state (winget packages, npm, uv, setup.windows)
+  common-base.yaml      ← cross-platform, every machine (dotnet tools, PS modules, git repos, setup.git)
+  common-personal.yaml  ← personal cross-platform state (additional tools, modules)
+  machines/             ← one file per named workstation (git.cloneRoot, machine-unique packages)
+  win/
+    windows-base.yaml   ← Windows base state (setup.windows, core winget packages)
+    windows-common.yaml ← Windows common state (npm globals, uv tools, additional winget packages)
+    windows-x64.yaml    ← x64-specific winget packages
+    windows-arm64.yaml  ← ARM64-specific winget packages
   config/               ← app config files, one folder per Publisher.AppName
 
 scripts/
@@ -150,14 +185,55 @@ working/          ← generated outputs, gitignored except .gitkeep
 
 ---
 
+## Machine YAML Structure
+
+A machine YAML only needs to declare what is unique to that machine:
+
+```yaml
+name: MY-MACHINE
+platform: win
+architecture: x64
+
+git:
+  cloneRoot: "%USERPROFILE%\\source\\repos"   # required for git repo cloning
+
+state:
+  - ../win/windows-base.yaml      # pulls in WindowsSetup + Winget resolvers
+  - ../win/windows-x64.yaml
+  - ../win/windows-common.yaml    # pulls in Node + Uv resolvers
+  - ../common-personal.yaml
+  - ../common-base.yaml           # pulls in DotNet + PSModule + GitRepos resolvers
+
+# scripts: only needed for machine-specific resolvers not covered by shared state files
+
+exclusions:
+  packages:
+    winget: []
+    msstore: []
+
+winget:
+  packages:
+    winget:
+      - id: Some.MachineSpecificPackage
+        name: Some.MachineSpecificPackage
+        required: true
+```
+
+The `scripts:` key is **omitted** unless the machine needs a resolver that no referenced
+state file already declares. The engine resolves the full script list automatically.
+
+---
+
 ## Rules for LLM Contributors
 
-1. **Cross-platform config belongs in `state/common.yaml`.** dotnet tools, PS modules,
+1. **Cross-platform config belongs in `state/common-base.yaml`.** dotnet tools, PS modules,
    git repos, `setup.git` IDs — anything that runs on every machine regardless of OS
    or architecture goes here.
 
-2. **Windows-specific config belongs in `state/win/windows-common.yaml`.** winget
-   packages, npm globals, uv tools, `setup.windows` IDs.
+2. **Windows-specific config belongs in `state/win/windows-base.yaml` or
+   `state/win/windows-common.yaml`.** Base winget packages and `setup.windows` IDs go in
+   `windows-base.yaml`; npm globals, uv tools, and additional packages go in
+   `windows-common.yaml`.
 
 3. **Primary state belongs in YAML.** If something is installed via Winget, npm, uv,
    dotnet, or PowerShell modules, it goes in `state/`, not in an app resolver.
@@ -183,14 +259,20 @@ working/          ← generated outputs, gitignored except .gitkeep
    `state/config/<Publisher.AppName>/` so the repo stays current and changes can
    be committed.
 
-9. **No Bash.** PowerShell 7+ only.
+9. **Do not add `scripts:` to machine YAML unless necessary.** Resolver scripts are
+   owned by the shared state files that declare the data they process. A new machine
+   only needs `git.cloneRoot` and a `state:` list — the engine resolves the correct
+   scripts automatically. Only add `scripts:` to a machine YAML for resolvers that no
+   referenced shared state file covers.
 
-10. **No hidden LLM dependency.** Every script must run without an LLM present.
+10. **No Bash.** PowerShell 7+ only.
 
-11. **Windows `sudo` is available.** The machine runs Windows 11 with `sudo` enabled in
+11. **No hidden LLM dependency.** Every script must run without an LLM present.
+
+12. **Windows `sudo` is available.** The machine runs Windows 11 with `sudo` enabled in
     `forceNewWindow` mode (`sudo config --enable forceNewWindow`). Scripts that need
     elevation can prefix commands with `sudo` rather than requiring a separate admin
-    session. The `sudo` setup entry in `state/win/windows-common.yaml` ensures this is
+    session. The `sudo` setup entry in `state/win/windows-base.yaml` ensures this is
     configured on every Windows machine. Catalog items with `RequiresAdmin = $true` in
     app resolvers are applied via the engine's admin-elevation path; they should not
     inline `sudo` themselves.
