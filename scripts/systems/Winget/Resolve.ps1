@@ -482,6 +482,12 @@ switch ($Stage) {
                             Invoke-RefreshPath
                             Write-Host "$tag Done"
                             Invoke-AppResolver -PackageId $item.id -ResolverStage Execute -Context $Context
+                            $applyScript = Join-Path $PSScriptRoot "..\..\apps\$($item.id)\apply.ps1"
+                            if (Test-Path -LiteralPath $applyScript) {
+                                Write-Host ""
+                                Write-Host "--- $($item.id) : apply.ps1 ---" -ForegroundColor Cyan
+                                & $applyScript -Context $Context -WhatIf:$WhatIfPreference
+                            }
                         }
                     }
                 }
@@ -502,6 +508,12 @@ switch ($Stage) {
                             Invoke-RefreshPath
                             Write-Host "$tag Done"
                             Invoke-AppResolver -PackageId $item.id -ResolverStage Execute -Context $Context
+                            $applyScript = Join-Path $PSScriptRoot "..\..\apps\$($item.id)\apply.ps1"
+                            if (Test-Path -LiteralPath $applyScript) {
+                                Write-Host ""
+                                Write-Host "--- $($item.id) : apply.ps1 ---" -ForegroundColor Cyan
+                                & $applyScript -Context $Context -WhatIf:$WhatIfPreference
+                            }
                         }
                     }
                 }
