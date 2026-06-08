@@ -1,0 +1,15 @@
+name: client-default
+platform: win
+architecture: x64
+
+git:
+  cloneRoot: "%USERPROFILE%\\source\\repos"
+
+state:
+  - ../win/windows-base.yaml
+  - ../common-base.yaml
+
+scripts:
+  - systems\WindowsSetup\Resolve.ps1
+  - systems\Winget\Resolve.ps1
+  - systems\PSModule\Resolve.ps1

@@ -1,0 +1,72 @@
+platform: win
+
+setup:
+  windows:
+    - long-paths
+    - execution-policy
+    - developer-mode
+    - show-file-extensions
+    - show-hidden-files
+    - show-protected-files
+    - sudo
+    - defender-exclusions
+
+winget:
+  packages:
+    winget:
+      - id: 7zip.7zip
+        name: 7zip.7zip
+        required: true
+      - id: astral-sh.uv
+        name: astral-sh.uv
+        required: true
+        priority: 10
+      - id: BurntSushi.ripgrep.MSVC
+        name: BurntSushi.ripgrep.MSVC
+        required: true
+      - id: Git.Git
+        name: Git.Git
+        required: true
+        priority: 10
+      - id: GitHub.cli
+        name: GitHub.cli
+        required: true
+      - id: jqlang.jq
+        name: jqlang.jq
+        required: true
+      - id: Microsoft.AppInstaller
+        name: Microsoft.AppInstaller
+        required: true
+      - id: Microsoft.DotNet.SDK.10
+        name: Microsoft.DotNet.SDK.10
+        required: true
+        priority: 10
+      - id: Microsoft.Edge
+        name: Microsoft.Edge
+        required: true
+      - id: Microsoft.OneDrive
+        name: Microsoft.OneDrive
+        required: true
+      - id: Microsoft.PowerShell
+        name: Microsoft.PowerShell
+        required: true
+        priority: 10
+      - id: Microsoft.PowerToys
+        name: Microsoft.PowerToys
+        required: true
+      - id: Microsoft.VCRedist.2015+.x64
+        name: Microsoft.VCRedist.2015+.x64
+        required: true
+      - id: Microsoft.VCRedist.2015+.x86
+        name: Microsoft.VCRedist.2015+.x86
+        required: true
+      - id: Microsoft.VisualStudioCode
+        name: Microsoft.VisualStudioCode
+        required: true
+        priority: 10
+      - id: Microsoft.WindowsTerminal
+        name: Microsoft.WindowsTerminal
+        required: true
+      - id: OpenJS.NodeJS
+        name: OpenJS.NodeJS
+        required: true

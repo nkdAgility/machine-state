@@ -1,13 +1,3 @@
-setup:
-  git:
-    - long-paths
-    - default-branch
-    - autocrlf
-    - pull-rebase
-    - editor-vscode
-    - diff-tool-vscode
-    - merge-tool-vscode
-
 dotnet:
   packages:
     tools:
@@ -27,15 +17,6 @@ dotnet:
 psmodules:
   packages:
     psgallery:
-      - id: powershell-yaml
-        name: powershell-yaml
-        required: true
-      - id: Pester
-        name: Pester
-        required: true
-      - id: PSScriptAnalyzer
-        name: PSScriptAnalyzer
-        required: true
       - id: ImportExcel
         name: ImportExcel
         required: true

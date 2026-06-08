@@ -72,24 +72,13 @@ function Resolve-MachineName {
         return $detected
     }
 
-    Write-Host "Detected machine '$detected' does not match a configured machine."
-    Write-Host "Available machines:"
-    for ($i = 0; $i -lt $available.Count; $i++) {
-        Write-Host "[$($i + 1)] $($available[$i])"
+    # Unknown machine — fall back to client-default (base tools only, no personal state)
+    if ($available -contains "client-default") {
+        Write-Host "Machine '$detected' is not a named machine — applying client base defaults." -ForegroundColor Yellow
+        return "client-default"
     }
 
-    $selection = Read-Host "Choose a machine by number"
-    $parsedSelection = 0
-    if (-not [int]::TryParse($selection, [ref]$parsedSelection)) {
-        throw "Invalid machine selection '$selection'."
-    }
-
-    $index = $parsedSelection - 1
-    if ($index -lt 0 -or $index -ge $available.Count) {
-        throw "Selection '$selection' is out of range."
-    }
-
-    return $available[$index]
+    throw "Machine '$detected' is not configured and no 'client-default' fallback exists. Available machines: $($available -join ', ')."
 }
 
 function Get-MachineStatePath {

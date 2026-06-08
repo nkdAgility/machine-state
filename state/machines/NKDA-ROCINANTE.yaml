@@ -5,7 +5,9 @@ architecture: arm64
 state:
   - ../win/windows-common.yaml
   - ../win/windows-arm64.yaml
-  - ../common.yaml
+  - ../common-personal.yaml
+  - ../win/windows-base.yaml
+  - ../common-base.yaml
 
 scripts:
   - systems\Winget\Resolve.ps1

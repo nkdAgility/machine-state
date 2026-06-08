@@ -68,14 +68,17 @@ Primary state is everything the machine needs *installed*. It lives in YAML unde
 
 | Concern | Where it lives |
 |---------|----------------|
-| Winget packages | `state/win/*.yaml`, `state/machines/<Name>.yaml` |
+| Winget packages (universal) | `state/win/windows-base.yaml` |
+| Winget packages (personal) | `state/win/windows-common.yaml`, `state/machines/<Name>.yaml` |
 | Node / npm globals | `state/win/windows-common.yaml` |
 | Python / uv tools | `state/win/windows-common.yaml` |
-| .NET global tools | `state/common.yaml` |
-| PowerShell modules | `state/common.yaml` |
-| Git repositories | `state/common.yaml` |
-| Windows OS setup | `state/win/windows-common.yaml` (`setup.windows`) |
-| Git global config | `state/common.yaml` (`setup.git`) |
+| .NET global tools | `state/common-personal.yaml` |
+| PowerShell modules (engine) | `state/common-base.yaml` |
+| PowerShell modules (personal) | `state/common-personal.yaml` |
+| Git repositories | `state/common-personal.yaml` |
+| Windows OS setup (universal) | `state/win/windows-base.yaml` (`setup.windows`) |
+| Windows OS setup (personal) | `state/win/windows-common.yaml` (`setup.windows`) |
+| Git global config | `state/common-base.yaml` (`setup.git`) |
 
 The engine merges these, deduplicates by `id`, sorts deterministically, and writes
 a combined manifest to `working/<MachineName>/` before executing.
@@ -124,10 +127,15 @@ directly if missing.
 
 ```
 state/
-  common.yaml         ← cross-platform, every machine (dotnet tools, PS modules, git repos, setup.git)
-  machines/           ← one file per named workstation
-  win/                ← Windows platform state (winget packages, npm, uv, setup.windows)
-  config/             ← app config files committed to the repo, one folder per Publisher.AppName
+  common-base.yaml      ← every machine: git config, engine PS modules (powershell-yaml, pester)
+  common-personal.yaml  ← personal machines: dotnet tools, personal PS modules, git repos
+  machines/             ← one file per named workstation; unknown machines use client-default.yaml
+  win/
+    windows-base.yaml   ← every Windows machine: ~17 universal dev tools + OS setup
+    windows-common.yaml ← personal Windows: OBS, StreamDeck, Elgato, VS Enterprise, etc.
+    windows-x64.yaml    ← x64-specific packages
+    windows-arm64.yaml  ← ARM64-specific packages
+  config/               ← app config files committed to the repo, one folder per Publisher.AppName
 
 scripts/
   State-Engine.ps1
