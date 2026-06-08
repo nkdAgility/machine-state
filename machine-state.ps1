@@ -1,4 +1,5 @@
 #Requires -Version 7.0
+$MachineStateVersion = "1.1.0"
 
 # -WhatIf behaviour:
 #   Merge always runs (needed to compute what would happen).
@@ -27,6 +28,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+Write-Host "machine-state v$MachineStateVersion" -ForegroundColor Green
 
 if ($VerboseOutput) {
     $VerbosePreference = "Continue"

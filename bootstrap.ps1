@@ -1,4 +1,5 @@
 #Requires -Version 5.1
+$BootstrapVersion = "1.1.0"
 <#
 .SYNOPSIS
     Bootstrap a fresh Windows machine: install PowerShell 7, Git, clone machine-state, then apply.
@@ -14,6 +15,8 @@
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+Write-Host "machine-state bootstrap v$BootstrapVersion" -ForegroundColor Green
 
 $RepoUrl   = "https://github.com/nkdAgility/machine-state.git"
 $CloneRoot = "$env:USERPROFILE\source\repos"
@@ -96,14 +99,7 @@ if (Test-Path "$RepoPath\.git") {
 
 # ── 5. Ensure powershell-yaml is available under pwsh 7 ─────────────────────
 Write-Step "powershell-yaml module"
-pwsh -NoLogo -Command {
-    if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
-        Write-Host "    Installing powershell-yaml ..."
-        Install-Module -Name powershell-yaml -Scope CurrentUser -Force -AllowClobber
-    } else {
-        Write-Host "    powershell-yaml already installed — skipping." -ForegroundColor DarkGray
-    }
-}
+pwsh -NoLogo -Command "if (-not (Get-Module -ListAvailable -Name powershell-yaml)) { Write-Host '    Installing powershell-yaml ...'; Install-Module -Name powershell-yaml -Scope CurrentUser -Force -AllowClobber } else { Write-Host '    powershell-yaml already installed - skipping.' }"
 
 # ── 6. Hand off to machine-state.ps1 under pwsh 7 ────────────────────────────
 Write-Step "Handing off to machine-state.ps1 (apply)"
