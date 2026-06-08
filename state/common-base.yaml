@@ -1,3 +1,10 @@
+dotnet:
+  packages:
+    tools:
+      - id: GitVersion.Tool
+        name: GitVersion.Tool
+        required: true
+
 setup:
   git:
     - long-paths
@@ -20,3 +27,9 @@ psmodules:
       - id: PSScriptAnalyzer
         name: PSScriptAnalyzer
         required: true
+
+git:
+  repos:
+    - url: https://github.com/nkdAgility/machine-state
+    - url: https://github.com/nkdAgility/azure-devops-migration-tools
+    - url: https://github.com/nkdAgility/azure-devops-migration-platform

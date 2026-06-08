@@ -10,9 +10,6 @@ dotnet:
       - id: dotnet-format
         name: dotnet-format
         required: true
-      - id: GitVersion.Tool
-        name: GitVersion.Tool
-        required: true
 
 psmodules:
   packages:
@@ -75,8 +72,6 @@ exclusions:
 
 git:
   repos:
-    - url: https://github.com/nkdAgility/machine-state
-    - url: https://github.com/nkdAgility/azure-devops-migration-tools
     - url: https://github.com/nkdAgility/engage-system
     - url: https://github.com/nkdAgility/NKDAgility.com
     - url: https://github.com/nkdAgility/NKDAgility.com-training

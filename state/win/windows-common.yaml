@@ -147,6 +147,10 @@ winget:
         name: Comet Browser
         required: true
     winget:
+      - id: astral-sh.uv
+        name: astral-sh.uv
+        required: true
+        priority: 10
       - id: AgileBits.1Password
         name: AgileBits.1Password
         required: true
@@ -155,10 +159,7 @@ winget:
         name: AgileBits.1Password.CLI
         required: true
         priority: 10
-      - id: Anthropic.Claude
-        name: Anthropic.Claude
-        required: true
-        priority: 10
+
       - id: Anysphere.Cursor
         name: Anysphere.Cursor
         required: true
@@ -167,6 +168,9 @@ winget:
         required: true
       - id: BenHollis.PNGGauntlet
         name: BenHollis.PNGGauntlet
+        required: true
+      - id: BurntSushi.ripgrep.MSVC
+        name: BurntSushi.ripgrep.MSVC
         required: true
       - id: Canonical.Ubuntu
         name: Canonical.Ubuntu
@@ -204,9 +208,7 @@ winget:
       - id: Foxit.PhantomPDF.Subscription.MSI
         name: Foxit.PhantomPDF.Subscription.MSI
         manual: true
-      - id: GitHub.CopilotApp
-        name: GitHub.CopilotApp
-        required: true
+
       - id: GoLang.Go
         name: GoLang.Go
         required: true
@@ -237,6 +239,7 @@ winget:
       - id: JohnMacFarlane.Pandoc
         name: JohnMacFarlane.Pandoc
         required: true
+
       - id: KirillOsenkov.MSBuildStructuredLogViewer
         name: KirillOsenkov.MSBuildStructuredLogViewer
         required: true
@@ -327,9 +330,7 @@ winget:
       - id: Microsoft.VCLibs.Desktop.14
         name: Microsoft.VCLibs.Desktop.14
         required: true
-      - id: Microsoft.VisualStudio.2022.BuildTools
-        name: Microsoft.VisualStudio.2022.BuildTools
-        required: true
+
       - id: Microsoft.VisualStudio.Enterprise
         name: Microsoft.VisualStudio.Enterprise
         required: true
@@ -369,9 +370,7 @@ winget:
       - id: NDI.NDIRuntime
         name: NDI.NDIRuntime
         required: true
-      - id: nkdAgility.AzureDevOpsMigrationTools
-        name: nkdAgility.AzureDevOpsMigrationTools
-        required: true
+
       - id: NSSM.NSSM
         name: NSSM.NSSM
         required: true
