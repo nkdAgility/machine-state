@@ -94,6 +94,17 @@ if (Test-Path "$RepoPath\.git") {
     git clone $RepoUrl $RepoPath
 }
 
-# ── 5. Hand off to machine-state.ps1 under pwsh 7 ────────────────────────────
+# ── 5. Ensure powershell-yaml is available under pwsh 7 ─────────────────────
+Write-Step "powershell-yaml module"
+pwsh -NoLogo -Command {
+    if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
+        Write-Host "    Installing powershell-yaml ..."
+        Install-Module -Name powershell-yaml -Scope CurrentUser -Force -AllowClobber
+    } else {
+        Write-Host "    powershell-yaml already installed — skipping." -ForegroundColor DarkGray
+    }
+}
+
+# ── 6. Hand off to machine-state.ps1 under pwsh 7 ────────────────────────────
 Write-Step "Handing off to machine-state.ps1 (apply)"
 pwsh -NoLogo -File "$RepoPath\machine-state.ps1" apply
