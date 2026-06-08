@@ -66,6 +66,11 @@ try {
     $machineState = Read-YamlFile -Path $machineStatePath
     $context = Get-MachineContext -ResolvedMachineName $resolvedMachineName -MachineStatePath $machineStatePath -MachineStateData $machineState
 
+    # Client machines are build/apply only — capture would write personal state back to the repo
+    if ($resolvedMachineName -eq "client-default" -and $Action -in @("capture", "sync", "export")) {
+        throw "Action '$Action' is not supported on client machines. Use 'apply' or 'build'."
+    }
+
     # Filter to specific scripts if -Script was provided
     if ($Script -and $Script.Count -gt 0) {
         $machineState.scripts = @($machineState.scripts | Where-Object { $Script -contains $_ })
