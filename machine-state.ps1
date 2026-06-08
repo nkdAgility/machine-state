@@ -46,6 +46,14 @@ if (-not (Test-Path -LiteralPath $stateEnginePath)) {
 . $stateEnginePath
 
 try {
+    # Pull latest before doing anything — safe to skip if git isn't installed yet
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        Write-Host "Pulling latest machine-state..." -ForegroundColor DarkCyan
+        git -C $RepositoryRoot pull --ff-only 2>&1 | ForEach-Object { Write-Host "  $_" }
+    } else {
+        Write-Host "git not found — skipping self-update (will be installed during apply)." -ForegroundColor DarkGray
+    }
+
     Initialize-YamlSupport
 
     if ($Action -eq "validate") {
