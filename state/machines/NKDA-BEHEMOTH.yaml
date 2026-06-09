@@ -33,6 +33,10 @@ winget:
         name: Nvidia.VideoEffectsSDK.20xx-Turing
         required: true
 
+      - id: Nvidia.VfxSDK
+        name: Nvidia.VfxSDK
+        required: true
+
     msstore:
       []
 
