@@ -10,6 +10,9 @@ dotnet:
       - id: GitVersion.Tool
         name: GitVersion.Tool
         required: true
+      - id: Aspire.Cli
+        name: Aspire.Cli
+        required: true
 
 setup:
   git:
