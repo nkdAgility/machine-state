@@ -20,7 +20,7 @@ This is the most important rule. Use the correct file based on scope:
 | Scope | File | Examples |
 |-------|------|---------|
 | **Cross-platform, every machine** | `state/common-base.yaml` | git repos, dotnet tools, PS modules, `setup.git` IDs |
-| **Personal / non-base cross-platform** | `state/common-personal.yaml` | personal dotnet tools, PS modules |
+| **Personal / non-base cross-platform** | `state/common-personal.yaml` | personal dotnet tools, PS modules, `workPackages` |
 | **Windows base (every Windows machine)** | `state/win/windows-base.yaml` | base winget packages, `setup.windows` IDs |
 | **Windows common (every Windows machine)** | `state/win/windows-common.yaml` | npm globals, uv tools, additional winget packages |
 | **Windows x64 only** | `state/win/windows-x64.yaml` | x64-specific winget packages |
@@ -144,9 +144,11 @@ winget package an app resolver belongs to.
 ## Repository Layout
 
 ```
+work-package.ps1        ← root launcher: open a named work package (repos → VS Code + wt tabs)
+
 state/
   common-base.yaml      ← cross-platform, every machine (dotnet tools, PS modules, git repos, setup.git)
-  common-personal.yaml  ← personal cross-platform state (additional tools, modules)
+  common-personal.yaml  ← personal cross-platform state (additional tools, modules, workPackages)
   machines/             ← one file per named workstation (git.cloneRoot, machine-unique packages)
   win/
     windows-base.yaml   ← Windows base state (setup.windows, core winget packages)
@@ -221,6 +223,46 @@ winget:
 
 The `scripts:` key is **omitted** unless the machine needs a resolver that no referenced
 state file already declares. The engine resolves the full script list automatically.
+
+---
+
+## Root Scripts & Work Packages
+
+The repo root is added to the **user PATH** by the `machine-state-path` setup topic
+(declared in `state/win/windows-base.yaml`, applied by `systems/WindowsSetup/Resolve.ps1`).
+This means any script committed to the repo root is runnable by name from anywhere once a
+machine has been set up — no copying into the profile, no full path. Keep such scripts at
+the root only when they are meant to be invoked **manually by the user** (not by the
+engine pipeline).
+
+### `work-package.ps1`
+
+`work-package.ps1` (repo root) opens a named set of repos together: VS Code per repo plus
+one Windows Terminal window with a named tab per repo.
+
+- `work-package` (no arg) → lists the packages defined for the current machine.
+- `work-package <id>` → starts that package.
+
+Work packages are **declarative state**, not hard-coded in the script. They live under a
+`workPackages:` section (personal ones in `state/common-personal.yaml`) and are a
+first-class merged section — the engine collects them across referenced state files and
+merges them **by `id`** (a machine YAML can override a shared package). The launcher reads
+the merged set via `Get-MergedWorkPackages`, so it always reflects current state with no
+build step.
+
+```yaml
+workPackages:
+  - id: website
+    name: NKDAgility Websites
+    terminalProfile: PowerShell        # optional, default PowerShell
+    repos:
+      - "%USERPROFILE%\\source\\repos\\NKDAgility.com"
+      - "%USERPROFILE%\\source\\repos\\Hinshelwood.com"
+```
+
+`repos` entries are expanded with `[Environment]::ExpandEnvironmentVariables`, so
+`%USERPROFILE%`-style paths are portable across machines. Missing folders are warned about
+and skipped, not fatal.
 
 ---
 

@@ -166,6 +166,42 @@ function Get-MergedScripts {
     return @(Merge-Scripts -Scripts $all)
 }
 
+function Get-WorkPackages {
+    param([AllowNull()][object]$StateObject)
+    if ($null -eq $StateObject) { return @() }
+    $node = Get-ObjectValue -Object $StateObject -Name "workPackages"
+    if (-not $node) { return @() }
+    return @($node)
+}
+
+function Get-MergedWorkPackages {
+    param(
+        [Parameter(Mandatory)][string]$MachineStatePath,
+        [object]$MachineStateData = $null
+    )
+    $machineState = if ($null -ne $MachineStateData) { $MachineStateData } else { Read-YamlFile -Path $MachineStatePath }
+    $all = [System.Collections.Generic.List[object]]::new()
+
+    foreach ($relativePath in @($machineState.state)) {
+        $resolvedPath = Join-Path (Split-Path -Parent $MachineStatePath) $relativePath
+        if (Test-Path -LiteralPath $resolvedPath) {
+            $sharedState = Read-YamlFile -Path $resolvedPath
+            foreach ($wp in @(Get-WorkPackages -StateObject $sharedState)) { $all.Add($wp) }
+        }
+    }
+    foreach ($wp in @(Get-WorkPackages -StateObject $machineState)) { $all.Add($wp) }
+
+    # Merge by id — later definitions (machine-specific) override earlier (shared) ones,
+    # preserving first-seen order so the listing is stable.
+    $byId = [ordered]@{}
+    foreach ($wp in $all) {
+        $id = [string](Get-ObjectValue -Object $wp -Name "id")
+        if (-not $id) { continue }
+        $byId[$id] = $wp
+    }
+    return @($byId.Values)
+}
+
 function Get-ObjectValue {
     param(
         [Parameter(Mandatory)]
@@ -589,6 +625,7 @@ function Merge-MachineState {
             windows = [string[]](Merge-SetupTopicIds -Ids $setupWindows)
             git     = [string[]](Merge-SetupTopicIds -Ids $setupGit)
         }
+        workPackages = @(Get-MergedWorkPackages -MachineStatePath $MachineStatePath -MachineStateData $machineState)
     }
 
     return [pscustomobject]$merged

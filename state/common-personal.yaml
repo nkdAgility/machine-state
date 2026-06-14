@@ -70,6 +70,20 @@ exclusions:
       - Microsoft.Graph.Users.Actions
       - Microsoft.Graph.Users.Functions
 
+# Work packages — named sets of repos opened together via the root-level
+# work-package.ps1 launcher (repo root must be on PATH; see windows-base.yaml
+# setup topic 'machine-state-path'). Each package opens VS Code per repo and a
+# single Windows Terminal window with one named tab per repo.
+workPackages:
+  - id: website
+    name: NKDAgility Websites
+    terminalProfile: PowerShell
+    repos:
+      - "%USERPROFILE%\\source\\repos\\NKDAgility.com"
+      - "%USERPROFILE%\\source\\repos\\NKDAgility.com-content"
+      - "%USERPROFILE%\\source\\repos\\NKDAgility.com-training"
+      - "%USERPROFILE%\\source\\repos\\Hinshelwood.com"
+
 git:
   repos:
     - url: https://github.com/nkdAgility/engage-system

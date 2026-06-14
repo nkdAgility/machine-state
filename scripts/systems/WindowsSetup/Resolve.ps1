@@ -180,6 +180,29 @@ $catalog = @(
     }
 
     @{
+        Id            = "machine-state-path"
+        Name          = "machine-state repo root on user PATH (enables root-level scripts e.g. work-package.ps1)"
+        RequiresAdmin = $false
+        Check         = {
+            $repoRoot = $Context.RepositoryRoot
+            $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+            $parts = @(($userPath ?? '') -split ';' | Where-Object { $_ })
+            $parts -contains $repoRoot
+        }
+        Apply         = {
+            $repoRoot = $Context.RepositoryRoot
+            $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+            $parts = @(($userPath ?? '') -split ';' | Where-Object { $_ })
+            if ($parts -notcontains $repoRoot) {
+                $parts += $repoRoot
+                [Environment]::SetEnvironmentVariable('Path', ($parts -join ';'), 'User')
+                # Reflect into the current session so scripts are runnable immediately
+                $env:Path = "$env:Path;$repoRoot"
+            }
+        }
+    }
+
+    @{
         Id            = "sudo"
         Name          = "Windows sudo (forceNewWindow — elevate without a new UAC session)"
         RequiresAdmin = $false

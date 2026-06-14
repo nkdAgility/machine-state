@@ -21,6 +21,7 @@ setup:
     - show-protected-files
     - sudo
     - defender-exclusions
+    - machine-state-path
 
 winget:
   packages:
