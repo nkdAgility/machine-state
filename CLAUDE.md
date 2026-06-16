@@ -255,6 +255,7 @@ workPackages:
   - id: website
     name: NKDAgility Websites
     terminalProfile: PowerShell        # optional, default PowerShell
+    desktop: true                      # optional, default false
     repos:
       - "%USERPROFILE%\\source\\repos\\NKDAgility.com"
       - "%USERPROFILE%\\source\\repos\\Hinshelwood.com"
@@ -263,6 +264,21 @@ workPackages:
 `repos` entries are expanded with `[Environment]::ExpandEnvironmentVariables`, so
 `%USERPROFILE%`-style paths are portable across machines. Missing folders are warned about
 and skipped, not fatal.
+
+`desktop: true` switches to a Windows **virtual desktop** named after the package's `name`
+before launching, so the windows open on it directly. It **reuses** an existing desktop of
+that name and only creates one if absent. This uses the Windows-only `VirtualDesktop`
+PSGallery module (declared under `psmodules:` in `state/win/windows-common.yaml`); if the
+module is missing or the Windows build is unsupported, the launcher warns and opens on the
+current desktop instead — it never blocks the launch.
+
+Re-running a package is idempotent on a best-effort basis. **VS Code** dedupes natively —
+`code <folder>` focuses an already-open window instead of opening a duplicate. **Windows
+Terminal** has no API to enumerate or merge tabs, so when `desktop: true` the launcher
+*refreshes* the terminal instead: it closes any WT windows already on the package's desktop
+(scoped via `Test-Window`, so unrelated terminals are left alone) and opens a fresh one.
+Without a desktop there's no reliable way to identify the package's window, so the refresh
+is skipped and a new window is opened each run.
 
 ---
 

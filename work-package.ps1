@@ -118,6 +118,44 @@ if ($present.Count -eq 0) {
     exit 1
 }
 
+# Optionally switch to a virtual desktop named after the package BEFORE launching,
+# so the new VS Code / Windows Terminal windows open on it directly (no fragile
+# move-by-handle). Reuses an existing desktop of that name; only creates one if absent.
+# Requires the Windows-only VirtualDesktop module (declared in state); degrades to the
+# current desktop if anything goes wrong (e.g. module missing or unsupported build).
+$desktop = $null
+$wantDesktop = [bool](Get-ObjectValue -Object $package -Name "desktop")
+if ($wantDesktop) {
+    try {
+        if (-not (Get-Module -ListAvailable -Name VirtualDesktop)) {
+            throw "VirtualDesktop module not installed (run 'machine-state apply')."
+        }
+        Import-Module VirtualDesktop -ErrorAction Stop
+
+        $count = Get-DesktopCount
+        for ($i = 0; $i -lt $count; $i++) {
+            $candidate = Get-Desktop -Index $i
+            if ((Get-DesktopName -Desktop $candidate) -eq $label) {
+                $desktop = $candidate
+                break
+            }
+        }
+
+        if ($desktop) {
+            Write-Host "  Virtual desktop: reusing '$label'"
+        } else {
+            $desktop = New-Desktop
+            Set-DesktopName -Desktop $desktop -Name $label | Out-Null
+            Write-Host "  Virtual desktop: created '$label'"
+        }
+
+        Switch-Desktop -Desktop $desktop
+    }
+    catch {
+        Write-Warning "Could not set up virtual desktop '$label' ($($_.Exception.Message)). Opening on the current desktop instead."
+    }
+}
+
 # Open each repo in VS Code (if available).
 if (Get-Command code -ErrorAction SilentlyContinue) {
     foreach ($repo in $present) {
@@ -126,6 +164,30 @@ if (Get-Command code -ErrorAction SilentlyContinue) {
     }
 } else {
     Write-Warning "'code' not found on PATH — skipping VS Code. In VS Code run 'Shell Command: Install code command in PATH'."
+}
+
+# Refresh the terminal: Windows Terminal exposes no API to enumerate or dedupe tabs,
+# so re-running a package would otherwise stack duplicate tabs. Instead, when the package
+# owns a virtual desktop, close any WT windows already on that desktop (scoped via
+# Test-Window so other terminals are untouched) and recreate a clean one below. Without a
+# desktop we can't reliably identify the package's window, so we skip the refresh.
+if ($desktop) {
+    try {
+        $stale = @(
+            Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue |
+                Where-Object { $_.MainWindowHandle -ne 0 -and (Test-Window -Desktop $desktop -Hwnd $_.MainWindowHandle) }
+        )
+        foreach ($proc in $stale) { [void]$proc.CloseMainWindow() }
+        if ($stale.Count -gt 0) {
+            Start-Sleep -Milliseconds 400
+            # Force-close any that ignored the graceful request (e.g. a close-confirmation prompt).
+            $stale | Where-Object { -not $_.HasExited } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Write-Host "  Windows Terminal: refreshed ($($stale.Count) existing window(s) closed)"
+        }
+    }
+    catch {
+        Write-Warning "Could not refresh existing Windows Terminal windows ($($_.Exception.Message)). Continuing."
+    }
 }
 
 # Open a single Windows Terminal window with one named tab per repo.

@@ -40,6 +40,15 @@ setup:
     - office-insider-beta
     - office-insider-behavior
 
+psmodules:
+  packages:
+    psgallery:
+      # Windows-only — powers the optional `desktop: true` flag on work packages
+      # (work-package.ps1). Degrades gracefully if unavailable.
+      - id: VirtualDesktop
+        name: VirtualDesktop
+        required: true
+
 uv:
   packages:
     uv:
