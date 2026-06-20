@@ -25,6 +25,7 @@ exclusions:
     - Microsoft.WindowsAppRuntime.1.7
     - Python.Python.3.9
     - TechSmith.Snagit.2024
+    - Warp.Warp
 platform: win
 uv:
   packages:
@@ -506,9 +507,6 @@ winget:
     - required: true
       name: Valve.Steam
       id: Valve.Steam
-    - required: true
-      name: Warp.Warp
-      id: Warp.Warp
     - required: true
       name: WinSCP.WinSCP
       id: WinSCP.WinSCP
