@@ -29,6 +29,8 @@ exclusions:
       - Microsoft.WindowsAppRuntime.1.5
       - Microsoft.WindowsAppRuntime.1.6
       - Microsoft.WindowsAppRuntime.1.7
+      - ElementLabs.LMStudio
+      - Ollama.Ollama
       - Python.Python.3.9
       - TechSmith.Snagit.2024
 
@@ -199,9 +201,6 @@ winget:
       - id: dotPDN.PaintDotNet
         name: dotPDN.PaintDotNet
         required: true
-      - id: ElementLabs.LMStudio
-        name: ElementLabs.LMStudio
-        required: true
       - id: Elgato.CameraHub
         name: Elgato.CameraHub
         required: true
@@ -297,8 +296,8 @@ winget:
       - id: Microsoft.DotNet.Runtime.10
         name: Microsoft.DotNet.Runtime.10
         required: true
-      - id: Microsoft.FoundryLocal
-        name: Microsoft.FoundryLocal
+      - id: Microsoft.Foundry
+        name: Microsoft.Foundry
         required: true
       - id: Microsoft.GameInput
         name: Microsoft.GameInput
@@ -397,9 +396,6 @@ winget:
         required: true
       - id: OBSProject.OBSStudio
         name: OBSProject.OBSStudio
-        required: true
-      - id: Ollama.Ollama
-        name: Ollama.Ollama
         required: true
       - id: OpenAI.Codex
         name: OpenAI.Codex
