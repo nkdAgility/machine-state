@@ -1,0 +1,11 @@
+name: client-default
+platform: win
+architecture: x64
+
+git:
+  cloneRoot: "%USERPROFILE%\\source\\repos"
+
+state:
+  - ../win/windows-base.yaml
+  - ../common-base.yaml
+

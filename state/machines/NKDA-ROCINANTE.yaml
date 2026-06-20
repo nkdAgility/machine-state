@@ -2,15 +2,15 @@ name: NKDA-ROCINANTE
 platform: win
 architecture: arm64
 
+git:
+  cloneRoot: "%USERPROFILE%\\source\\repos"
+
 state:
   - ../win/windows-common.yaml
   - ../win/windows-arm64.yaml
-  - ../common.yaml
-
-scripts:
-  - systems\Winget\Resolve.ps1
-  - systems\Node\Resolve.ps1
-  - systems\Uv\Resolve.ps1
+  - ../common-personal.yaml
+  - ../win/windows-base.yaml
+  - ../common-base.yaml
 
 exclusions:
   packages:

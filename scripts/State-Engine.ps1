@@ -72,24 +72,13 @@ function Resolve-MachineName {
         return $detected
     }
 
-    Write-Host "Detected machine '$detected' does not match a configured machine."
-    Write-Host "Available machines:"
-    for ($i = 0; $i -lt $available.Count; $i++) {
-        Write-Host "[$($i + 1)] $($available[$i])"
+    # Unknown machine — fall back to client-default (base tools only, no personal state)
+    if ($available -contains "client-default") {
+        Write-Host "Machine '$detected' is not a named machine — applying client base defaults." -ForegroundColor Yellow
+        return "client-default"
     }
 
-    $selection = Read-Host "Choose a machine by number"
-    $parsedSelection = 0
-    if (-not [int]::TryParse($selection, [ref]$parsedSelection)) {
-        throw "Invalid machine selection '$selection'."
-    }
-
-    $index = $parsedSelection - 1
-    if ($index -lt 0 -or $index -ge $available.Count) {
-        throw "Selection '$selection' is out of range."
-    }
-
-    return $available[$index]
+    throw "Machine '$detected' is not configured and no 'client-default' fallback exists. Available machines: $($available -join ', ')."
 }
 
 function Get-MachineStatePath {
@@ -119,6 +108,98 @@ function Read-YamlFile {
     }
 
     return $yamlText | ConvertFrom-Yaml
+}
+
+# Canonical resolver execution order — scripts collected from state files are sorted by this list.
+# Scripts not in this list are appended after, in the order first encountered.
+$script:CanonicalScriptOrder = @(
+    'systems\WindowsSetup\Resolve.ps1',
+    'systems\Winget\Resolve.ps1',
+    'systems\DotNet\Resolve.ps1',
+    'systems\PSModule\Resolve.ps1',
+    'systems\Node\Resolve.ps1',
+    'systems\Uv\Resolve.ps1',
+    'systems\GitRepos\Resolve.ps1',
+    'systems\GitReposCleanup\Resolve.ps1'
+)
+
+function Get-StateScripts {
+    param([AllowNull()][object]$StateObject)
+    if ($null -eq $StateObject) { return @() }
+    $scriptsNode = Get-ObjectValue -Object $StateObject -Name "scripts"
+    if (-not $scriptsNode) { return @() }
+    return @($scriptsNode | Where-Object { $_ } | ForEach-Object { [string]$_ })
+}
+
+function Merge-Scripts {
+    param([AllowNull()][array]$Scripts)
+    $seen = [System.Collections.Generic.HashSet[string]]([System.StringComparer]::OrdinalIgnoreCase)
+    $result = [System.Collections.Generic.List[string]]::new()
+    foreach ($s in $script:CanonicalScriptOrder) {
+        if (($Scripts -contains $s) -and $seen.Add($s)) {
+            $result.Add($s)
+        }
+    }
+    foreach ($s in @($Scripts)) {
+        if ($s -and $seen.Add($s)) {
+            $result.Add($s)
+        }
+    }
+    return [string[]]$result
+}
+
+function Get-MergedScripts {
+    param(
+        [Parameter(Mandatory)][string]$MachineStatePath,
+        [object]$MachineStateData = $null
+    )
+    $machineState = if ($null -ne $MachineStateData) { $MachineStateData } else { Read-YamlFile -Path $MachineStatePath }
+    $all = @()
+    foreach ($relativePath in @($machineState.state)) {
+        $resolvedPath = Join-Path (Split-Path -Parent $MachineStatePath) $relativePath
+        if (Test-Path -LiteralPath $resolvedPath) {
+            $sharedState = Read-YamlFile -Path $resolvedPath
+            $all += @(Get-StateScripts -StateObject $sharedState)
+        }
+    }
+    $all += @(Get-StateScripts -StateObject $machineState)
+    return @(Merge-Scripts -Scripts $all)
+}
+
+function Get-WorkPackages {
+    param([AllowNull()][object]$StateObject)
+    if ($null -eq $StateObject) { return @() }
+    $node = Get-ObjectValue -Object $StateObject -Name "workPackages"
+    if (-not $node) { return @() }
+    return @($node)
+}
+
+function Get-MergedWorkPackages {
+    param(
+        [Parameter(Mandatory)][string]$MachineStatePath,
+        [object]$MachineStateData = $null
+    )
+    $machineState = if ($null -ne $MachineStateData) { $MachineStateData } else { Read-YamlFile -Path $MachineStatePath }
+    $all = [System.Collections.Generic.List[object]]::new()
+
+    foreach ($relativePath in @($machineState.state)) {
+        $resolvedPath = Join-Path (Split-Path -Parent $MachineStatePath) $relativePath
+        if (Test-Path -LiteralPath $resolvedPath) {
+            $sharedState = Read-YamlFile -Path $resolvedPath
+            foreach ($wp in @(Get-WorkPackages -StateObject $sharedState)) { $all.Add($wp) }
+        }
+    }
+    foreach ($wp in @(Get-WorkPackages -StateObject $machineState)) { $all.Add($wp) }
+
+    # Merge by id — later definitions (machine-specific) override earlier (shared) ones,
+    # preserving first-seen order so the listing is stable.
+    $byId = [ordered]@{}
+    foreach ($wp in $all) {
+        $id = [string](Get-ObjectValue -Object $wp -Name "id")
+        if (-not $id) { continue }
+        $byId[$id] = $wp
+    }
+    return @($byId.Values)
 }
 
 function Get-ObjectValue {
@@ -500,7 +581,7 @@ function Merge-MachineState {
         platform     = [string]$machineState.platform
         architecture = [string]$machineState.architecture
         state        = @($machineState.state)
-        scripts      = @($machineState.scripts)
+        scripts      = @(Get-MergedScripts -MachineStatePath $MachineStatePath -MachineStateData $machineState)
         exclusions   = [ordered]@{
             packages = [ordered]@{
                 winget     = [string[]]$wingetExclusions
@@ -544,6 +625,7 @@ function Merge-MachineState {
             windows = [string[]](Merge-SetupTopicIds -Ids $setupWindows)
             git     = [string[]](Merge-SetupTopicIds -Ids $setupGit)
         }
+        workPackages = @(Get-MergedWorkPackages -MachineStatePath $MachineStatePath -MachineStateData $machineState)
     }
 
     return [pscustomobject]$merged
@@ -1060,13 +1142,36 @@ function Invoke-StageExecute {
         Invoke-ResolverScript -ScriptName $scriptName -Stage Execute -Context $Context
     }
 
+    # Build the set of desired package IDs from the merged state so apply.ps1
+    # only runs for packages that are actually wanted on this machine.
+    $desiredAppIds = [System.Collections.Generic.HashSet[string]]([System.StringComparer]::OrdinalIgnoreCase)
+    if (Test-Path -LiteralPath $Context.MergedStateJson) {
+        $mergedForApps = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
+        foreach ($src in @("winget", "msstore")) {
+            $srcPackages = $mergedForApps.winget?.packages?.$src
+            if ($srcPackages) {
+                foreach ($pkg in @($srcPackages)) {
+                    $pkgId = $pkg.id
+                    if ($pkgId) { [void]$desiredAppIds.Add([string]$pkgId) }
+                }
+            }
+        }
+    }
+
     $appsRoot = Join-Path $Context.RepositoryRoot "scripts\apps"
     if (Test-Path -LiteralPath $appsRoot) {
         foreach ($appDir in Get-ChildItem -LiteralPath $appsRoot -Directory | Sort-Object Name) {
             $script = Join-Path $appDir.FullName "apply.ps1"
-            if (Test-Path -LiteralPath $script) {
-                Invoke-AppScript -ScriptPath $script -Context $Context
+            if (-not (Test-Path -LiteralPath $script)) { continue }
+
+            # Skip apps not desired on this machine (prevents e.g. StreamDeck or
+            # Nvidia.ArSDK from running on a client workstation that never asked for them).
+            if ($desiredAppIds.Count -gt 0 -and -not $desiredAppIds.Contains($appDir.Name)) {
+                Write-Verbose "Skipping apply.ps1 for '$($appDir.Name)' — not in desired packages for this machine"
+                continue
             }
+
+            Invoke-AppScript -ScriptPath $script -Context $Context
         }
     }
 
@@ -1263,7 +1368,8 @@ function Invoke-StageValidate {
             $resolvedStateFiles += $resolvedPath
         }
 
-        foreach ($scriptName in @($machineState.scripts)) {
+        $mergedScripts = @(Get-MergedScripts -MachineStatePath $machinePath -MachineStateData $machineState)
+        foreach ($scriptName in $mergedScripts) {
             $scriptPath = Join-Path $ScriptsRoot $scriptName
             if (-not (Test-Path -LiteralPath $scriptPath)) {
                 throw "Resolver script not found for machine '$machine': $scriptPath"

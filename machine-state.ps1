@@ -27,6 +27,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$MachineStateVersion = "1.1.0"
+
+Write-Host "machine-state v$MachineStateVersion" -ForegroundColor Green
 
 if ($VerboseOutput) {
     $VerbosePreference = "Continue"
@@ -46,6 +49,14 @@ if (-not (Test-Path -LiteralPath $stateEnginePath)) {
 . $stateEnginePath
 
 try {
+    # Pull latest before doing anything — safe to skip if git isn't installed yet
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        Write-Host "Pulling latest machine-state..." -ForegroundColor DarkCyan
+        git -C $RepositoryRoot pull --ff-only 2>&1 | ForEach-Object { Write-Host "  $_" }
+    } else {
+        Write-Host "git not found — skipping self-update (will be installed during apply)." -ForegroundColor DarkGray
+    }
+
     Initialize-YamlSupport
 
     if ($Action -eq "validate") {
@@ -56,7 +67,13 @@ try {
     $resolvedMachineName = Resolve-MachineName -RequestedMachineName $MachineName
     $machineStatePath = Get-MachineStatePath -ResolvedMachineName $resolvedMachineName
     $machineState = Read-YamlFile -Path $machineStatePath
+    $machineState['scripts'] = @(Get-MergedScripts -MachineStatePath $machineStatePath -MachineStateData $machineState)
     $context = Get-MachineContext -ResolvedMachineName $resolvedMachineName -MachineStatePath $machineStatePath -MachineStateData $machineState
+
+    # Client machines are build/apply only — capture would write personal state back to the repo
+    if ($resolvedMachineName -eq "client-default" -and $Action -in @("capture", "sync", "export")) {
+        throw "Action '$Action' is not supported on client machines. Use 'apply' or 'build'."
+    }
 
     # Filter to specific scripts if -Script was provided
     if ($Script -and $Script.Count -gt 0) {

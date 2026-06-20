@@ -21,17 +21,37 @@ Given the same input YAML, the output is always the same.
 | NKDA-BEHEMOTH | Windows x64 | Intel i9, NVIDIA GPU |
 | NKDA-ROCINANTE | Windows ARM64 | Snapdragon Surface, 64 GB RAM |
 
-## How to Run
+---
 
-On a fresh machine or from `cmd.exe`, use the bootstrap wrapper:
+## Fresh Machine Bootstrap
 
-```cmd
-machine-state.cmd sync
+On a brand-new Windows machine — nothing installed, repo not cloned — open an
+**elevated PowerShell prompt** and run:
+
+```powershell
+irm https://raw.githubusercontent.com/nkdAgility/machine-state/main/bootstrap.ps1 | iex
 ```
 
-This installs PowerShell 7+ and the YAML module if missing, then hands off to the script.
+This single command will:
 
-If PowerShell 7+ is already available:
+1. Ensure `winget` is available:
+   - **Windows 11 / Windows Server 2025** — ships pre-installed; verified on PATH.
+   - **Windows Server 2019 / 2022** — automatically installs VCLibs, Microsoft.UI.Xaml, and the winget msixbundle, then fixes PATH.
+   - **Windows 10 client** — prompts to install **App Installer** from the Microsoft Store if winget is absent.
+2. Install **PowerShell 7** via winget
+3. Install **Git** via winget
+4. Clone this repo to `%USERPROFILE%\source\repos\machine-state`
+5. Install `powershell-yaml` under pwsh 7
+6. Hand off to `machine-state.ps1 apply` under PowerShell 7
+
+If the repo is already cloned it pulls the latest instead of re-cloning. Safe to re-run at any time.
+
+> **Tip — WhatIf:** append `-WhatIf` to the final `pwsh` call inside `bootstrap.ps1` if you want
+> to preview what would be installed without making any changes.
+
+---
+
+## How to Run (repo already cloned)
 
 ```powershell
 ./machine-state.ps1 sync           # Capture current state, then apply desired state
@@ -52,14 +72,15 @@ Primary state is everything the machine needs *installed*. It lives in YAML unde
 
 | Concern | Where it lives |
 |---------|----------------|
-| Winget packages | `state/win/*.yaml`, `state/machines/<Name>.yaml` |
+| Winget packages (base) | `state/win/windows-base.yaml` |
+| Winget packages (common/personal) | `state/win/windows-common.yaml`, `state/machines/<Name>.yaml` |
 | Node / npm globals | `state/win/windows-common.yaml` |
 | Python / uv tools | `state/win/windows-common.yaml` |
-| .NET global tools | `state/common.yaml` |
-| PowerShell modules | `state/common.yaml` |
-| Git repositories | `state/common.yaml` |
-| Windows OS setup | `state/win/windows-common.yaml` (`setup.windows`) |
-| Git global config | `state/common.yaml` (`setup.git`) |
+| .NET global tools | `state/common-base.yaml`, `state/common-personal.yaml` |
+| PowerShell modules | `state/common-base.yaml`, `state/common-personal.yaml` |
+| Git repositories | `state/common-base.yaml`, `state/common-personal.yaml` |
+| Windows OS setup | `state/win/windows-base.yaml` (`setup.windows`) |
+| Git global config | `state/common-base.yaml` (`setup.git`) |
 
 The engine merges these, deduplicates by `id`, sorts deterministically, and writes
 a combined manifest to `working/<MachineName>/` before executing.
@@ -108,10 +129,15 @@ directly if missing.
 
 ```
 state/
-  common.yaml         ← cross-platform, every machine (dotnet tools, PS modules, git repos, setup.git)
-  machines/           ← one file per named workstation
-  win/                ← Windows platform state (winget packages, npm, uv, setup.windows)
-  config/             ← app config files committed to the repo, one folder per Publisher.AppName
+  common-base.yaml      ← every machine: git config, engine PS modules (powershell-yaml, pester)
+  common-personal.yaml  ← personal machines: dotnet tools, personal PS modules, git repos
+  machines/             ← one file per named workstation; unknown machines use client-default.yaml
+  win/
+    windows-base.yaml   ← every Windows machine: ~17 universal dev tools + OS setup
+    windows-common.yaml ← personal Windows: OBS, StreamDeck, Elgato, VS Enterprise, etc.
+    windows-x64.yaml    ← x64-specific packages
+    windows-arm64.yaml  ← ARM64-specific packages
+  config/               ← app config files committed to the repo, one folder per Publisher.AppName
 
 scripts/
   State-Engine.ps1

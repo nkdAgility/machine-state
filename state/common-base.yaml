@@ -1,0 +1,44 @@
+scripts:
+  - systems\DotNet\Resolve.ps1
+  - systems\PSModule\Resolve.ps1
+  - systems\GitRepos\Resolve.ps1
+  - systems\GitReposCleanup\Resolve.ps1
+
+dotnet:
+  packages:
+    tools:
+      - id: GitVersion.Tool
+        name: GitVersion.Tool
+        required: true
+      - id: Aspire.Cli
+        name: Aspire.Cli
+        required: true
+
+setup:
+  git:
+    - long-paths
+    - default-branch
+    - autocrlf
+    - pull-rebase
+    - editor-vscode
+    - diff-tool-vscode
+    - merge-tool-vscode
+
+psmodules:
+  packages:
+    psgallery:
+      - id: powershell-yaml
+        name: powershell-yaml
+        required: true
+      - id: Pester
+        name: Pester
+        required: true
+      - id: PSScriptAnalyzer
+        name: PSScriptAnalyzer
+        required: true
+
+git:
+  repos:
+    - url: https://github.com/nkdAgility/machine-state
+    - url: https://github.com/nkdAgility/azure-devops-migration-tools
+    - url: https://github.com/nkdAgility/azure-devops-migration-platform

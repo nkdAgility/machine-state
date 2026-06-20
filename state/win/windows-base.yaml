@@ -1,0 +1,81 @@
+platform: win
+
+scripts:
+  - systems\WindowsSetup\Resolve.ps1
+  - systems\Winget\Resolve.ps1
+
+exclusions:
+  packages:
+    winget:
+      - Microsoft.AppInstaller
+      - Microsoft.Edge
+      - Microsoft.OneDrive
+
+setup:
+  windows:
+    - long-paths
+    - execution-policy
+    - developer-mode
+    - show-file-extensions
+    - show-hidden-files
+    - show-protected-files
+    - sudo
+    - defender-exclusions
+    - machine-state-path
+
+winget:
+  packages:
+    winget:
+      - id: 7zip.7zip
+        name: 7zip.7zip
+        required: true
+      - id: Anthropic.Claude
+        name: Anthropic.Claude
+        required: true
+        priority: 10
+      - id: Git.Git
+        name: Git.Git
+        required: true
+        priority: 10
+      - id: GitHub.cli
+        name: GitHub.cli
+        required: true
+      - id: GitHub.CopilotApp
+        name: GitHub.CopilotApp
+        required: true
+      - id: jqlang.jq
+        name: jqlang.jq
+        required: true
+      - id: Microsoft.DotNet.SDK.10
+        name: Microsoft.DotNet.SDK.10
+        required: true
+        priority: 10
+      - id: Microsoft.PowerShell
+        name: Microsoft.PowerShell
+        required: true
+        priority: 10
+      - id: Microsoft.PowerToys
+        name: Microsoft.PowerToys
+        required: true
+      - id: Microsoft.VCRedist.2015+.x64
+        name: Microsoft.VCRedist.2015+.x64
+        required: true
+      - id: Microsoft.VCRedist.2015+.x86
+        name: Microsoft.VCRedist.2015+.x86
+        required: true
+      - id: Microsoft.VisualStudio.2022.BuildTools
+        name: Microsoft.VisualStudio.2022.BuildTools
+        required: true
+      - id: Microsoft.VisualStudioCode
+        name: Microsoft.VisualStudioCode
+        required: true
+        priority: 10
+      - id: Microsoft.WindowsTerminal
+        name: Microsoft.WindowsTerminal
+        required: true
+      - id: nkdAgility.AzureDevOpsMigrationTools
+        name: nkdAgility.AzureDevOpsMigrationTools
+        required: true
+      - id: OpenJS.NodeJS
+        name: OpenJS.NodeJS
+        required: true

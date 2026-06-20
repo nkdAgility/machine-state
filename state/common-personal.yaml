@@ -1,13 +1,3 @@
-setup:
-  git:
-    - long-paths
-    - default-branch
-    - autocrlf
-    - pull-rebase
-    - editor-vscode
-    - diff-tool-vscode
-    - merge-tool-vscode
-
 dotnet:
   packages:
     tools:
@@ -20,22 +10,10 @@ dotnet:
       - id: dotnet-format
         name: dotnet-format
         required: true
-      - id: GitVersion.Tool
-        name: GitVersion.Tool
-        required: true
 
 psmodules:
   packages:
     psgallery:
-      - id: powershell-yaml
-        name: powershell-yaml
-        required: true
-      - id: Pester
-        name: Pester
-        required: true
-      - id: PSScriptAnalyzer
-        name: PSScriptAnalyzer
-        required: true
       - id: ImportExcel
         name: ImportExcel
         required: true
@@ -92,10 +70,23 @@ exclusions:
       - Microsoft.Graph.Users.Actions
       - Microsoft.Graph.Users.Functions
 
+# Work packages — named sets of repos opened together via the root-level
+# work-package.ps1 launcher (repo root must be on PATH; see windows-base.yaml
+# setup topic 'machine-state-path'). Each package opens VS Code per repo and a
+# single Windows Terminal window with one named tab per repo.
+workPackages:
+  - id: website
+    name: NKDAgility Websites
+    terminalProfile: PowerShell
+    desktop: true                      # open on a virtual desktop named after `name`
+    repos:
+      - "%USERPROFILE%\\source\\repos\\NKDAgility.com"
+      - "%USERPROFILE%\\source\\repos\\NKDAgility.com-content"
+      - "%USERPROFILE%\\source\\repos\\NKDAgility.com-training"
+      - "%USERPROFILE%\\source\\repos\\Hinshelwood.com"
+
 git:
   repos:
-    - url: https://github.com/nkdAgility/machine-state
-    - url: https://github.com/nkdAgility/azure-devops-migration-tools
     - url: https://github.com/nkdAgility/engage-system
     - url: https://github.com/nkdAgility/NKDAgility.com
     - url: https://github.com/nkdAgility/NKDAgility.com-training

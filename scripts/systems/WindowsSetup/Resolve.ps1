@@ -180,6 +180,29 @@ $catalog = @(
     }
 
     @{
+        Id            = "machine-state-path"
+        Name          = "machine-state repo root on user PATH (enables root-level scripts e.g. work-package.ps1)"
+        RequiresAdmin = $false
+        Check         = {
+            $repoRoot = $Context.RepositoryRoot
+            $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+            $parts = @(($userPath ?? '') -split ';' | Where-Object { $_ })
+            $parts -contains $repoRoot
+        }
+        Apply         = {
+            $repoRoot = $Context.RepositoryRoot
+            $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+            $parts = @(($userPath ?? '') -split ';' | Where-Object { $_ })
+            if ($parts -notcontains $repoRoot) {
+                $parts += $repoRoot
+                [Environment]::SetEnvironmentVariable('Path', ($parts -join ';'), 'User')
+                # Reflect into the current session so scripts are runnable immediately
+                $env:Path = "$env:Path;$repoRoot"
+            }
+        }
+    }
+
+    @{
         Id            = "sudo"
         Name          = "Windows sudo (forceNewWindow — elevate without a new UAC session)"
         RequiresAdmin = $false
@@ -189,6 +212,70 @@ $catalog = @(
         }
         Apply         = {
             sudo config --enable forceNewWindow
+        }
+    }
+
+    @{
+        Id            = "defender-exclusions"
+        Name          = "Windows Defender exclusions for dev tooling caches"
+        RequiresAdmin = $true
+        Check         = {
+            $profile = $env:USERPROFILE
+            $expected = @(
+                "$profile\.agents",
+                "$profile\.cache",
+                "$profile\.copilot",
+                "$profile\.ollama\models",
+                "$profile\.vscode",
+                "$profile\.vscode-insiders",
+                "$profile\.nuget\packages",
+                "$profile\AppData\Local\npm-cache",
+                "$profile\AppData\Local\pnpm",
+                "$profile\AppData\Local\Yarn",
+                "$profile\AppData\Local\Temp\yarn-cache",
+                "$profile\AppData\Local\pip\Cache",
+                "$profile\.conda",
+                "$profile\.virtualenvs",
+                "$profile\AppData\Local\JetBrains",
+                "$profile\AppData\Roaming\JetBrains",
+                "$profile\AppData\Local\Docker",
+                "$profile\AppData\Roaming\Docker",
+                "$profile\.aitk",
+                "$profile\source"
+            )
+            $current = (Get-MpPreference).ExclusionPath ?? @()
+            $missing = $expected | Where-Object { $_ -notin $current }
+            $missing.Count -eq 0
+        }
+        Apply         = {
+            $profile = $env:USERPROFILE
+            $desired = @(
+                "$profile\.agents",
+                "$profile\.cache",
+                "$profile\.copilot",
+                "$profile\.ollama\models",
+                "$profile\.vscode",
+                "$profile\.vscode-insiders",
+                "$profile\.nuget\packages",
+                "$profile\AppData\Local\npm-cache",
+                "$profile\AppData\Local\pnpm",
+                "$profile\AppData\Local\Yarn",
+                "$profile\AppData\Local\Temp\yarn-cache",
+                "$profile\AppData\Local\pip\Cache",
+                "$profile\.conda",
+                "$profile\.virtualenvs",
+                "$profile\AppData\Local\JetBrains",
+                "$profile\AppData\Roaming\JetBrains",
+                "$profile\AppData\Local\Docker",
+                "$profile\AppData\Roaming\Docker",
+                "$profile\.aitk",
+                "$profile\source"
+            )
+            $current = (Get-MpPreference).ExclusionPath ?? @()
+            $toAdd = $desired | Where-Object { $_ -notin $current }
+            foreach ($path in $toAdd) {
+                Add-MpPreference -ExclusionPath $path
+            }
         }
     }
 
