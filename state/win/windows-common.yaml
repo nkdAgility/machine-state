@@ -3,6 +3,7 @@ platform: win
 scripts:
   - systems\Node\Resolve.ps1
   - systems\Uv\Resolve.ps1
+  - systems\Foundry\Resolve.ps1
 
 exclusions:
   packages:

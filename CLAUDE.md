@@ -25,7 +25,7 @@ This is the most important rule. Use the correct file based on scope:
 | **Windows common (every Windows machine)** | `state/win/windows-common.yaml` | npm globals, uv tools, additional winget packages |
 | **Windows x64 only** | `state/win/windows-x64.yaml` | x64-specific winget packages |
 | **Windows ARM64 only** | `state/win/windows-arm64.yaml` | ARM64-specific winget packages |
-| **One specific machine** | `state/machines/<Name>.yaml` | machine-unique packages, `git.cloneRoot` |
+| **One specific machine** | `state/machines/<Name>.yaml` | machine-unique packages, `git.cloneRoot`, `foundry` models (the right model set is hardware-specific) |
 
 **If it is cross-platform and not machine-specific, it goes in `state/common-base.yaml`.**
 
@@ -41,7 +41,7 @@ have genuinely machine-specific resolvers.
 | State file | Scripts it declares | Why |
 |------------|--------------------|----|
 | `state/win/windows-base.yaml` | `WindowsSetup`, `Winget` | owns `setup.windows` and base winget packages |
-| `state/win/windows-common.yaml` | `Node`, `Uv` | owns `node` and `uv` sections |
+| `state/win/windows-common.yaml` | `Node`, `Uv`, `Foundry` | owns `node` and `uv` sections; declares the `Foundry` resolver (Foundry Local is installed on every Windows machine), while the `foundry` model data itself lives per-machine |
 | `state/common-base.yaml` | `DotNet`, `PSModule`, `GitRepos`, `GitReposCleanup` | owns `dotnet`, `psmodules`, `git.repos` sections |
 
 **Canonical execution order** (enforced by `Merge-Scripts` in `State-Engine.ps1`):
@@ -52,8 +52,9 @@ have genuinely machine-specific resolvers.
 4. `systems\PSModule\Resolve.ps1`
 5. `systems\Node\Resolve.ps1`
 6. `systems\Uv\Resolve.ps1`
-7. `systems\GitRepos\Resolve.ps1`
-8. `systems\GitReposCleanup\Resolve.ps1`
+7. `systems\Foundry\Resolve.ps1`
+8. `systems\GitRepos\Resolve.ps1`
+9. `systems\GitReposCleanup\Resolve.ps1`
 
 Scripts not in this list are appended after in first-encountered order.
 
@@ -72,6 +73,7 @@ merge, build, and execute pipeline:
 | Winget packages | `state/win/windows-base.yaml`, `state/win/windows-common.yaml`, `state/win/windows-x64.yaml`, `state/win/windows-arm64.yaml`, `state/machines/<Name>.yaml` | `systems/Winget/Resolve.ps1` |
 | Node / npm globals | `state/win/windows-common.yaml` | `systems/Node/Resolve.ps1` |
 | Python / uv tools | `state/win/windows-common.yaml` | `systems/Uv/Resolve.ps1` |
+| Foundry Local models | `state/machines/<Name>.yaml` (`foundry.packages.foundry`) | `systems/Foundry/Resolve.ps1` |
 | .NET global tools | `state/common-base.yaml` | `systems/DotNet/Resolve.ps1` |
 | PowerShell modules | `state/common-base.yaml` | `systems/PSModule/Resolve.ps1` |
 | Git repositories | `state/common-base.yaml` | `systems/GitRepos/Resolve.ps1` |
@@ -145,6 +147,7 @@ winget package an app resolver belongs to.
 
 ```
 work-package.ps1        ← root launcher: open a named work package (repos → VS Code + wt tabs)
+publish-secrets.ps1     ← root launcher: sync 1Password secrets to local env + GitHub org Actions secrets
 
 state/
   common-base.yaml      ← cross-platform, every machine (dotnet tools, PS modules, git repos, setup.git)
@@ -168,6 +171,7 @@ scripts/
     PSModule/Resolve.ps1        ← PowerShell modules
     Node/Resolve.ps1            ← npm global packages
     Uv/Resolve.ps1              ← uv tools
+    Foundry/Resolve.ps1         ← Foundry Local models (per-machine model set)
     GitRepos/Resolve.ps1        ← git repo clone/pull
     GitReposCleanup/Resolve.ps1 ← git branch cleanup
   apps/
@@ -279,6 +283,31 @@ Terminal** has no API to enumerate or merge tabs, so when `desktop: true` the la
 (scoped via `Test-Window`, so unrelated terminals are left alone) and opens a fresh one.
 Without a desktop there's no reliable way to identify the package's window, so the refresh
 is skipped and a new window is opened each run.
+
+### `publish-secrets.ps1`
+
+`publish-secrets.ps1` (repo root) syncs secrets out of the shared 1Password vault
+(`p4h6jpjo6e24ivjxiahaw7skoy`) in two **independent, tag-driven** operations:
+
+- **Local** — items tagged `environment-variable` are set as Machine-scope environment
+  variables. This is the same vault and tag the `NkdAgility.Secrets` engine app
+  (`scripts/apps/NkdAgility.Secrets/apply.ps1`) reads during `machine-state apply`; the
+  root script is a manual convenience that does both jobs in one run.
+- **Publish** — items tagged `github-organisation` are pushed to the `nkdagility` GitHub
+  organisation as org-level **Actions** secrets with `all repositories` visibility. This
+  tag is the deliberate "not all of them" selector: a secret only publishes if you add the
+  `github-organisation` tag to its 1Password item.
+
+A field's label becomes the variable / secret name; GitHub names are normalised to
+GitHub's allowed pattern (`[A-Z0-9_]`, not starting with a digit or `GITHUB_`) and a
+rename is reported. Values are piped to `gh secret set` via stdin so they never appear on
+a command line. Use `-WhatIf` to preview, `-LocalOnly` / `-PublishOnly` to run one side,
+and `-Org` to target a different organisation.
+
+Publishing org secrets needs a `gh` token with **`admin:org`** scope; if a push 403s the
+script prints the `gh auth refresh -h github.com -s admin:org` hint. Both `op` (1Password
+CLI) and `gh` (GitHub CLI) must be installed — the script warns and skips if either is
+missing. Like the engine app, it elevates via `sudo` only to set Machine-scope env vars.
 
 ---
 

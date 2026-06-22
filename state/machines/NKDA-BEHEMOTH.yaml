@@ -40,3 +40,33 @@ winget:
     msstore:
       []
 
+# Foundry Local models — RTX 3090 (24 GB VRAM). 14B-class dense models run
+# comfortably on-GPU (~55-70 t/s measured); gpt-oss-20b is the MoE "step up".
+foundry:
+  packages:
+    foundry:
+      - id: qwen3-14b
+        name: qwen3-14b
+        required: true
+      - id: phi-4
+        name: phi-4
+        required: true
+      - id: qwen2.5-coder-14b
+        name: qwen2.5-coder-14b
+        required: true
+      - id: gpt-oss-20b
+        name: gpt-oss-20b
+        required: true
+      - id: phi-4-reasoning
+        name: phi-4-reasoning
+        required: true
+      - id: phi-4-mini
+        name: phi-4-mini
+        required: true
+      - id: qwen3-8b
+        name: qwen3-8b
+        required: true
+      - id: qwen3-embedding-8b
+        name: qwen3-embedding-8b
+        required: true
+

@@ -27,3 +27,25 @@ winget:
     msstore:
       []
 
+# Foundry Local models — Surface Pro 11 (Snapdragon X Elite). Bandwidth-bound, so
+# keep to 3-4B for snappy use (phi-4-mini ~27 t/s measured); qwen3-8b is a patience
+# stretch (~7 t/s). 12B+ would load but crawl, so it is deliberately excluded.
+foundry:
+  packages:
+    foundry:
+      - id: phi-4-mini
+        name: phi-4-mini
+        required: true
+      - id: qwen3-4b
+        name: qwen3-4b
+        required: true
+      - id: smollm3-3b
+        name: smollm3-3b
+        required: true
+      - id: ministral-3-3b-instruct-2512
+        name: ministral-3-3b-instruct-2512
+        required: true
+      - id: qwen3-8b
+        name: qwen3-8b
+        required: true
+

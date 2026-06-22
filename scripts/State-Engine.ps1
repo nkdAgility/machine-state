@@ -119,6 +119,7 @@ $script:CanonicalScriptOrder = @(
     'systems\PSModule\Resolve.ps1',
     'systems\Node\Resolve.ps1',
     'systems\Uv\Resolve.ps1',
+    'systems\Foundry\Resolve.ps1',
     'systems\GitRepos\Resolve.ps1',
     'systems\GitReposCleanup\Resolve.ps1'
 )
@@ -474,6 +475,7 @@ function Merge-MachineState {
     $msstorePackages = @()
     $npmPackages     = @()
     $uvPackages      = @()
+    $foundryModels   = @()
     $gitRepos        = @()
     $setupWindows      = @()
     $setupGit          = @()
@@ -489,6 +491,7 @@ function Merge-MachineState {
         $msstorePackages    += @(Get-SourcePackages -StateObject $sharedState -SourceName "msstore")
         $npmPackages        += @(Get-SectionPackages -StateObject $sharedState -SectionName "node" -SourceName "npm")
         $uvPackages         += @(Get-SectionPackages -StateObject $sharedState -SectionName "uv" -SourceName "uv")
+        $foundryModels      += @(Get-SectionPackages -StateObject $sharedState -SectionName "foundry" -SourceName "foundry")
         $dotnetToolPackages += @(Get-SectionPackages -StateObject $sharedState -SectionName "dotnet" -SourceName "tools")
         $psmodulePackages   += @(Get-SectionPackages -StateObject $sharedState -SectionName "psmodules" -SourceName "psgallery")
         $gitRepos           += @(Get-GitRepos -StateObject $sharedState)
@@ -502,6 +505,7 @@ function Merge-MachineState {
     $msstorePackages    += @(Get-SourcePackages -StateObject $machineState -SourceName "msstore")
     $npmPackages        += @(Get-SectionPackages -StateObject $machineState -SectionName "node" -SourceName "npm")
     $uvPackages         += @(Get-SectionPackages -StateObject $machineState -SectionName "uv" -SourceName "uv")
+    $foundryModels      += @(Get-SectionPackages -StateObject $machineState -SectionName "foundry" -SourceName "foundry")
     $dotnetToolPackages += @(Get-SectionPackages -StateObject $machineState -SectionName "dotnet" -SourceName "tools")
     $psmodulePackages   += @(Get-SectionPackages -StateObject $machineState -SectionName "psmodules" -SourceName "psgallery")
     $gitRepos           += @(Get-GitRepos -StateObject $machineState)
@@ -516,12 +520,14 @@ function Merge-MachineState {
     $msstoreExclusions    = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "msstore")
     $npmExclusions        = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "npm")
     $uvExclusions         = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "uv")
+    $foundryExclusions    = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "foundry")
     $psgalleryExclusions  = @(Get-CombinedExclusionIds -StateObjects $stateObjects -SourceName "psgallery")
 
     $mergedWingetPackages      = @(Merge-PackageSource -Packages $wingetPackages)
     $mergedMsstorePackages     = @(Merge-PackageSource -Packages $msstorePackages)
     $mergedNpmPackages         = @(Merge-PackageSource -Packages $npmPackages)
     $mergedUvPackages          = @(Merge-PackageSource -Packages $uvPackages)
+    $mergedFoundryModels       = @(Merge-PackageSource -Packages $foundryModels)
     $mergedDotnetToolPackages  = @(Merge-PackageSource -Packages $dotnetToolPackages)
     $mergedPsmodulePackages    = @(Merge-PackageSource -Packages $psmodulePackages)
     $mergedGitRepos            = @(Merge-GitRepos -Repos $gitRepos)
@@ -566,6 +572,16 @@ function Merge-MachineState {
         )
     }
 
+    if ($foundryExclusions.Count -gt 0) {
+        $mergedFoundryModels = @(
+            $mergedFoundryModels |
+                Where-Object {
+                    $id = Get-ObjectValue -Object $_ -Name "id"
+                    $id -and ([string]$id -notin $foundryExclusions)
+                }
+        )
+    }
+
     if ($psgalleryExclusions.Count -gt 0) {
         $mergedPsmodulePackages = @(
             $mergedPsmodulePackages |
@@ -588,6 +604,7 @@ function Merge-MachineState {
                 msstore    = [string[]]$msstoreExclusions
                 npm        = [string[]]$npmExclusions
                 uv         = [string[]]$uvExclusions
+                foundry    = [string[]]$foundryExclusions
                 psgallery  = [string[]]$psgalleryExclusions
             }
         }
@@ -605,6 +622,11 @@ function Merge-MachineState {
         uv           = [ordered]@{
             packages = [ordered]@{
                 uv = $mergedUvPackages
+            }
+        }
+        foundry      = [ordered]@{
+            packages = [ordered]@{
+                foundry = $mergedFoundryModels
             }
         }
         dotnet       = [ordered]@{
