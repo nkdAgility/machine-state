@@ -10,6 +10,7 @@ exclusions:
     msstore:
       - Microsoft.VisualStudioCode
     winget:
+      - Anysphere.Cursor
       - Canonical.Ubuntu.1804
       - Microsoft.DotNet.DesktopRuntime.6
       - Microsoft.DotNet.Framework.DeveloperPack_4
@@ -33,7 +34,9 @@ exclusions:
       - ElementLabs.LMStudio
       - Ollama.Ollama
       - Python.Python.3.9
+      - StrawberryPerl.StrawberryPerl
       - TechSmith.Snagit.2024
+      - Warp.Warp
 
 setup:
   windows:
@@ -175,9 +178,6 @@ winget:
         required: true
         priority: 10
 
-      - id: Anysphere.Cursor
-        name: Anysphere.Cursor
-        required: true
       - id: Apple.Bonjour
         name: Apple.Bonjour
         required: true
@@ -437,9 +437,6 @@ winget:
       - id: Spotify.Spotify
         name: Spotify.Spotify
         manual: true
-      - id: StrawberryPerl.StrawberryPerl
-        name: StrawberryPerl.StrawberryPerl
-        required: true
       - id: TeamViewer.TeamViewer
         name: TeamViewer.TeamViewer
         required: true
@@ -457,9 +454,6 @@ winget:
         required: true
       - id: Valve.Steam
         name: Valve.Steam
-        required: true
-      - id: Warp.Warp
-        name: Warp.Warp
         required: true
       - id: WinSCP.WinSCP
         name: WinSCP.WinSCP
