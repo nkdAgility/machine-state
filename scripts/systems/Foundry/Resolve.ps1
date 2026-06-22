@@ -49,7 +49,7 @@ function Get-CachedFoundryAliases {
 
 switch ($Stage) {
     "Export" {
-        Install-ToolIfMissing -Command foundry -WingetId Microsoft.Foundry -DisplayName "Foundry Local"
+        Install-ToolIfMissing -Command foundry -WingetId Microsoft.FoundryLocal -DisplayName "Foundry Local"
         New-DirectoryIfMissing -Path $Context.ExportPath
 
         $exportModel = [ordered]@{
@@ -105,7 +105,7 @@ switch ($Stage) {
             return
         }
 
-        Install-ToolIfMissing -Command foundry -WingetId Microsoft.Foundry -DisplayName "Foundry Local"
+        Install-ToolIfMissing -Command foundry -WingetId Microsoft.FoundryLocal -DisplayName "Foundry Local"
 
         # Live check: which desired models are not yet in the local cache.
         Write-Host "Querying cached Foundry models..."

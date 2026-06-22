@@ -298,6 +298,9 @@ winget:
       - id: Microsoft.DotNet.Runtime.10
         name: Microsoft.DotNet.Runtime.10
         required: true
+      - id: Microsoft.FoundryLocal
+        name: Microsoft.FoundryLocal
+        required: true
       - id: Microsoft.GameInput
         name: Microsoft.GameInput
         required: true

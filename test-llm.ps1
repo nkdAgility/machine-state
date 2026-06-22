@@ -199,8 +199,8 @@ foreach ($mod in @('powershell-yaml', 'PwshSpectreConsole')) {
 }
 
 if (-not (Get-Command foundry -ErrorAction SilentlyContinue)) {
-    Write-Host "  Installing Microsoft.Foundry via winget..." -ForegroundColor Yellow
-    winget install --id Microsoft.Foundry --silent --accept-package-agreements --accept-source-agreements
+    Write-Host "  Installing Microsoft.FoundryLocal via winget..." -ForegroundColor Yellow
+    winget install --id Microsoft.FoundryLocal --silent --accept-package-agreements --accept-source-agreements
     $env:PATH = [System.Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' +
                 [System.Environment]::GetEnvironmentVariable('PATH', 'User')
     if (-not (Get-Command foundry -ErrorAction SilentlyContinue)) {
