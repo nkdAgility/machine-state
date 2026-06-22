@@ -20,6 +20,7 @@ exclusions:
       - Microsoft.DotNet.SDK.9
       - Microsoft.DotNet.SDK.Preview
       - Microsoft.EdgeWebView2Runtime
+      - Microsoft.Foundry
       - Microsoft.UI.Xaml.2.7
       - Microsoft.VCRedist.2010.x64
       - Microsoft.VCRedist.2010.x86
@@ -296,9 +297,6 @@ winget:
         required: true
       - id: Microsoft.DotNet.Runtime.10
         name: Microsoft.DotNet.Runtime.10
-        required: true
-      - id: Microsoft.Foundry
-        name: Microsoft.Foundry
         required: true
       - id: Microsoft.GameInput
         name: Microsoft.GameInput
