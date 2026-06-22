@@ -53,6 +53,20 @@
       - Stop-UtilizationSampler: cleanup path; must not shadow an earlier real error.
       - Inner JSON chunk parsing loop in Invoke-StreamingCompletion: malformed SSE
         chunks from the API are expected and should be skipped, not crash the benchmark.
+      - Streaming read loop in Invoke-StreamingCompletion: the Foundry server can drop
+        the streaming HTTP connection ("The response ended prematurely / ResponseEnded"),
+        most often on the cold first call while the model is still warming. This is a
+        transient server condition, not a script bug, so it is retried (when it drops
+        before any token) or accepted as a truncated measurement (when it drops after
+        tokens have streamed). Test-TransientStreamError gates this so genuine script
+        bugs still surface immediately. See that function and the retry loop.
+      - Per-call crash recovery in the runs loop: the Foundry inference backend itself
+        can crash mid-benchmark (HTTP frontend stays up and returns 200, then the body
+        drops). When Invoke-StreamingCompletion's own retries are exhausted it throws;
+        the call site catches ONLY transient errors (Test-TransientStreamError — real
+        bugs are rethrown), restarts the server, reloads the model and retries once. If
+        recovery still fails, the model is recorded as completed:false and the loop moves
+        on to the next model rather than aborting the whole benchmark.
 
     If you find yourself adding try/catch to "fix" an error, you have a bug. Fix the code.
 
@@ -424,6 +438,35 @@ function Stop-UtilizationSampler {
 }
 
 # ---------------------------------------------------------------------------
+# Transient streaming-failure detection
+# ---------------------------------------------------------------------------
+# Distinguishes a dropped/timed-out Foundry connection (worth retrying) from a
+# real script bug (must surface). Walks the inner-exception chain because a
+# .NET method failure reaches us wrapped in a MethodInvocationException whose
+# real cause (IOException / WebException) is the InnerException.
+function Test-TransientStreamError {
+    param($ErrorRecord)
+    $ex = $ErrorRecord.Exception
+    while ($ex) {
+        if ($ex.Message -match 'response ended prematurely|ResponseEnded|transport connection|operation has timed out|actively refused|connection was closed|unexpectedly closed|forcibly closed') {
+            return $true
+        }
+        $ex = $ex.InnerException
+    }
+    return $false
+}
+
+# Unwraps a PowerShell ErrorRecord to the innermost .NET exception message — the
+# one that actually says what went wrong. The outer layers are just
+# "Exception calling ReadLine ..." wrappers that hide the real cause.
+function Get-RootExceptionMessage {
+    param($ErrorRecord)
+    $ex = $ErrorRecord.Exception
+    while ($ex.InnerException) { $ex = $ex.InnerException }
+    return $ex.Message
+}
+
+# ---------------------------------------------------------------------------
 # Streaming completion — TTFT + utilisation + thermal + token counts
 # ---------------------------------------------------------------------------
 function Invoke-StreamingCompletion {
@@ -438,7 +481,6 @@ function Invoke-StreamingCompletion {
     )
 
     $thermal = Get-ThermalState
-    $sampler = Start-UtilizationSampler
 
     $body = @{
         model          = $ModelId
@@ -450,54 +492,87 @@ function Invoke-StreamingCompletion {
         stream_options = @{ include_usage = $true }
     } | ConvertTo-Json -Compress -Depth 5
 
-    $swTotal      = [System.Diagnostics.Stopwatch]::StartNew()
+    # The Foundry server occasionally drops the streaming HTTP connection (see the
+    # error-handling philosophy in .NOTES). We retry the whole call when it drops
+    # before any token arrives; a drop after tokens have streamed is kept as a
+    # (truncated) measurement. Test-TransientStreamError ensures genuine script bugs
+    # are rethrown immediately instead of being retried away.
+    $maxAttempts  = 3
+    $attempt      = 0
+    $sampler      = $null
+    $swTotal      = $null
     $firstTokenMs = $null
     $tokenCount   = 0
     $promptTokens = $null
     $totalTokens  = $null
+    $streamError  = $null
 
-    try {
-        $req             = [System.Net.HttpWebRequest]::Create("$ApiBase/chat/completions")
-        $req.Method      = 'POST'
-        $req.ContentType = 'application/json'
-        $req.Timeout     = $TimeoutSeconds * 1000
-        $reqBytes        = [System.Text.Encoding]::UTF8.GetBytes($body)
-        $req.ContentLength = $reqBytes.Length
-        $reqStream       = $req.GetRequestStream()
-        $reqStream.Write($reqBytes, 0, $reqBytes.Length)
-        $reqStream.Close()
+    while ($true) {
+        $attempt++
+        $sampler      = Start-UtilizationSampler
+        $swTotal      = [System.Diagnostics.Stopwatch]::StartNew()
+        $firstTokenMs = $null
+        $tokenCount   = 0
+        $promptTokens = $null
+        $totalTokens  = $null
+        $streamError  = $null
 
-        $resp   = $req.GetResponse()
-        $reader = [System.IO.StreamReader]::new($resp.GetResponseStream())
+        try {
+            $req             = [System.Net.HttpWebRequest]::Create("$ApiBase/chat/completions")
+            $req.Method      = 'POST'
+            $req.ContentType = 'application/json'
+            $req.Timeout     = $TimeoutSeconds * 1000
+            $reqBytes        = [System.Text.Encoding]::UTF8.GetBytes($body)
+            $req.ContentLength = $reqBytes.Length
+            $reqStream       = $req.GetRequestStream()
+            $reqStream.Write($reqBytes, 0, $reqBytes.Length)
+            $reqStream.Close()
 
-        while (-not $reader.EndOfStream) {
-            $line = $reader.ReadLine()
-            if ($line -notmatch '^data: ') { continue }
-            $data = $line.Substring(6).Trim()
-            if ($data -eq '[DONE]') { break }
-            try {
-                $chunk    = $data | ConvertFrom-Json -ErrorAction Stop
-                $usage    = Get-JsonProp $chunk 'usage'
-                if ($usage) {
-                    $promptTokens = Get-JsonProp $usage 'prompt_tokens'
-                    $totalTokens  = Get-JsonProp $usage 'total_tokens'
-                }
-                $choices  = Get-JsonProp $chunk 'choices'
-                $delta    = if ($choices -and $choices.Count -gt 0) { Get-JsonProp (Get-JsonProp $choices[0] 'delta') 'content' } else { $null }
-                if ($delta) {
-                    if ($null -eq $firstTokenMs) { $firstTokenMs = $swTotal.Elapsed.TotalSeconds }
-                    $tokenCount++
-                }
-            } catch { }
+            $resp   = $req.GetResponse()
+            $reader = [System.IO.StreamReader]::new($resp.GetResponseStream())
+
+            while (-not $reader.EndOfStream) {
+                $line = $reader.ReadLine()
+                if ($line -notmatch '^data: ') { continue }
+                $data = $line.Substring(6).Trim()
+                if ($data -eq '[DONE]') { break }
+                try {
+                    $chunk    = $data | ConvertFrom-Json -ErrorAction Stop
+                    $usage    = Get-JsonProp $chunk 'usage'
+                    if ($usage) {
+                        $promptTokens = Get-JsonProp $usage 'prompt_tokens'
+                        $totalTokens  = Get-JsonProp $usage 'total_tokens'
+                    }
+                    $choices  = Get-JsonProp $chunk 'choices'
+                    $delta    = if ($choices -and $choices.Count -gt 0) { Get-JsonProp (Get-JsonProp $choices[0] 'delta') 'content' } else { $null }
+                    if ($delta) {
+                        if ($null -eq $firstTokenMs) { $firstTokenMs = $swTotal.Elapsed.TotalSeconds }
+                        $tokenCount++
+                    }
+                } catch { }
+            }
+            $reader.Close(); $resp.Close()
         }
-        $reader.Close(); $resp.Close()
-    }
-    catch {
+        catch {
+            $streamError = $_
+        }
+
+        # Clean finish, or a drop after tokens already streamed: accept this attempt.
+        if ($null -eq $streamError -or $tokenCount -gt 0) { break }
+
+        # Zero tokens. Dispose this attempt's sampler before retrying so we don't leak
+        # runspaces, then retry only on a recognised transient drop.
         Stop-UtilizationSampler -Sampler $sampler | Out-Null
-        throw
+        if (-not (Test-TransientStreamError $streamError) -or $attempt -ge $maxAttempts) {
+            throw $streamError
+        }
+        $reason = Get-RootExceptionMessage $streamError
+        Write-Host "      stream dropped before first token: $reason (attempt $attempt/$maxAttempts) — retrying..." -ForegroundColor Yellow
+        Start-Sleep -Milliseconds 750
     }
 
     $swTotal.Stop()
+    $truncated    = ($null -ne $streamError)
     $util         = Stop-UtilizationSampler -Sampler $sampler
     $totalSec     = $swTotal.Elapsed.TotalSeconds
     $sustainedSec = if ($firstTokenMs) { $totalSec - $firstTokenMs } else { $totalSec }
@@ -508,6 +583,8 @@ function Invoke-StreamingCompletion {
 
     return [PSCustomObject]@{
         Prompt                = $Prompt
+        Attempts              = $attempt
+        Truncated             = $truncated
         PromptTokens          = $promptTokens
         CompletionTokens      = $tokenCount
         TotalTokens           = $totalTokens
@@ -758,12 +835,23 @@ foreach ($model in $Models) {
     $loadTimer.Stop()
     $loadSec = [math]::Round($loadTimer.Elapsed.TotalSeconds, 3)
 
-    # --- Parse variant + quantisation + ORT provider.
+    # --- Resolve the friendly name to the actual API model id, plus variant /
+    #     ORT provider / quantisation.
+    #
+    #     CRITICAL: foundry's /v1/chat/completions endpoint does NOT accept the
+    #     friendly alias ("phi-4"), nor the variant id with its ":N" suffix
+    #     ("Phi-4-cuda-gpu:2"). It accepts ONLY the displayName ("Phi-4-cuda-gpu").
+    #     Sending the alias makes the server return 200 then immediately drop the
+    #     connection ("The response ended prematurely / ResponseEnded") — which is
+    #     exactly the cold-call failure that aborted benchmarks. We therefore load
+    #     by friendly name (what the user passes) but CALL by displayName.
+    #
+    #     JSON shape: { "model": { alias, id, displayName, device,
+    #       variants: [ { id, displayName, executionProvider, ... } ] } }.
     #     Use Get-JsonProp for all access — direct $obj.field throws under strict mode
-    #     when the field is absent in the JSON. foundry model info -o json is safe to
-    #     capture; without -o json it uses Spectre Console and must run raw.
-    #     ORT provider mapping: Foundry "GPU"->WebGpuExecutionProvider,
-    #     "NPU"->QNNExecutionProvider, "CPU"->CPUExecutionProvider. ---
+    #     when the field is absent. foundry model info -o json is safe to capture;
+    #     without -o json it uses Spectre Console and must run raw. ---
+    $apiModelId   = $model     # fallback: friendly name (only kept if info parse fails)
     $variant      = $null
     $provider     = $null
     $quantization = $null
@@ -771,33 +859,46 @@ foreach ($model in $Models) {
     Write-Host ""
     Write-Host "  foundry model info $model -o json" -ForegroundColor DarkCyan
     try {
-        $infoJson  = foundry model info $model -o json 2>&1 | Out-String
-        $info      = $infoJson | ConvertFrom-Json -ErrorAction SilentlyContinue
-        $variants  = Get-JsonProp $info 'variants'
-        $candidates = if ($variants) { @($variants) } else { @($info) }
-        $loaded    = $candidates | Where-Object {
-            (Get-JsonProp $_ 'isLoaded') -or (Get-JsonProp $_ 'loaded') -or ((Get-JsonProp $_ 'status') -eq 'loaded')
-        } | Select-Object -First 1
-        if (-not $loaded) { $loaded = $candidates | Select-Object -First 1 }
-        $variant  = Get-JsonProp $loaded 'alias'
-        if (-not $variant) { $variant = Get-JsonProp $loaded 'id' }
-        if (-not $variant) { $variant = Get-JsonProp $loaded 'name' }
-        $hwLabel  = Get-JsonProp $loaded 'executionProvider'
-        if (-not $hwLabel) { $hwLabel = Get-JsonProp $loaded 'provider' }
-        if (-not $hwLabel) { $hwLabel = Get-JsonProp $loaded 'device' }
-        if (-not $hwLabel) { $hwLabel = Get-JsonProp $loaded 'hardware' }
-        $provider = switch -Wildcard ($hwLabel) {
-            '*NPU*' { 'QNNExecutionProvider' }
-            '*GPU*' { 'WebGpuExecutionProvider' }
-            '*CPU*' { 'CPUExecutionProvider' }
-            default { $hwLabel }
+        $infoJson = foundry model info $model -o json 2>&1 | Out-String
+        $info     = $infoJson | ConvertFrom-Json -ErrorAction SilentlyContinue
+        $m        = Get-JsonProp $info 'model'
+        if (-not $m) { $m = $info }   # tolerate a flat (non-nested) shape
+
+        # API model id: displayName is the only id the endpoint accepts.
+        $displayName     = Get-JsonProp $m 'displayName'
+        $loadedVariantId = Get-JsonProp $m 'id'
+        if ($displayName)         { $apiModelId = $displayName }
+        elseif ($loadedVariantId) { $apiModelId = $loadedVariantId }
+
+        $variant = if ($displayName) { $displayName }
+                   elseif ($loadedVariantId) { $loadedVariantId }
+                   else { Get-JsonProp $m 'alias' }
+
+        # Execution provider: prefer the loaded variant's real ORT provider name
+        # (e.g. CUDAExecutionProvider) over the coarse "device" label, which would
+        # otherwise mis-map a CUDA GPU to WebGpuExecutionProvider.
+        $variants = Get-JsonProp $m 'variants'
+        $hwLabel  = $null
+        if ($variants) {
+            $vmatch = @($variants) | Where-Object { (Get-JsonProp $_ 'id') -eq $loadedVariantId } | Select-Object -First 1
+            if ($vmatch) { $hwLabel = Get-JsonProp $vmatch 'executionProvider' }
         }
-        $quantization = Get-JsonProp $loaded 'quantization'
-        if (-not $quantization) { $quantization = Get-JsonProp $loaded 'quantType' }
-        if (-not $quantization) { $quantization = Get-JsonProp $loaded 'quant' }
-        if (-not $quantization) { $quantization = Get-JsonProp $loaded 'bits' }
-        if (-not $quantization) { $quantization = Get-JsonProp $info 'quantization' }
-        if (-not $quantization) { $quantization = Get-JsonProp $info 'dtype' }
+        if ($hwLabel) {
+            $provider = $hwLabel   # already a full *ExecutionProvider name
+        } else {
+            $deviceLabel = Get-JsonProp $m 'device'
+            $provider = switch -Wildcard ($deviceLabel) {
+                '*NPU*' { 'QNNExecutionProvider' }
+                '*GPU*' { 'WebGpuExecutionProvider' }
+                '*CPU*' { 'CPUExecutionProvider' }
+                default { $deviceLabel }
+            }
+        }
+
+        $quantization = Get-JsonProp $m 'quantization'
+        if (-not $quantization) { $quantization = Get-JsonProp $m 'quantType' }
+        if (-not $quantization) { $quantization = Get-JsonProp $m 'quant' }
+        if (-not $quantization) { $quantization = Get-JsonProp $m 'dtype' }
         if ($null -ne $quantization -and $quantization -isnot [string]) { $quantization = [string]$quantization }
     } catch { }
 
@@ -809,11 +910,12 @@ foreach ($model in $Models) {
         continue
     }
 
-    Write-Host "  Loaded in ${loadSec}s  provider: $provider  variant: $variant  quant: $quantization" -ForegroundColor Green
+    Write-Host "  Loaded in ${loadSec}s  apiModelId: $apiModelId  provider: $provider  variant: $variant  quant: $quantization" -ForegroundColor Green
 
     Out-Yaml "      - id: $(Format-YamlString $model)"
     Out-Yaml "        loadSucceeded: true"
     Out-Yaml "        loadTimeSec: $loadSec"
+    if ($apiModelId)   { Out-Yaml "        apiModelId: $(Format-YamlString $apiModelId)" }
     if ($provider)     { Out-Yaml "        executionProvider: $(Format-YamlString $provider)" }
     if ($variant)      { Out-Yaml "        variant: $(Format-YamlString $variant)" }
     if ($quantization) { Out-Yaml "        quantization: $(Format-YamlString $quantization)" }
@@ -822,6 +924,7 @@ foreach ($model in $Models) {
     # --- Runs loop (no restart between runs) ---
     $modelOverallTps   = [System.Collections.Generic.List[double]]::new()
     $modelSustainedTps = [System.Collections.Generic.List[double]]::new()
+    $modelCrashed      = $false
 
     for ($run = 1; $run -le $Runs; $run++) {
         Write-Host ""
@@ -843,10 +946,55 @@ foreach ($model in $Models) {
 
             Write-Host "    Call $($i+1)/$Calls$coldLabel '$shortPrompt'" -ForegroundColor DarkGray
 
-            $r = Invoke-StreamingCompletion `
-                -ModelId $model -Prompt $prompt -ApiBase $ApiBase `
-                -MaxTokensArg $MaxTokens -TemperatureArg $Temperature -TopPArg $TopP `
-                -IsCold $isCold
+            # The Foundry inference backend can crash mid-run (the HTTP frontend stays
+            # up and returns 200, then drops the body — "ResponseEnded"). When the
+            # in-process retries in Invoke-StreamingCompletion are exhausted it throws;
+            # we catch ONLY transient/connection errors (Test-TransientStreamError) so
+            # real script bugs still surface, then recover by restarting the server and
+            # reloading the model on a fresh backend/port and retrying the call once.
+            # If recovery also fails we record the crash and abandon THIS model, so one
+            # flaky model can no longer abort the entire benchmark.
+            $r         = $null
+            $callError = $null
+            try {
+                $r = Invoke-StreamingCompletion `
+                    -ModelId $apiModelId -Prompt $prompt -ApiBase $ApiBase `
+                    -MaxTokensArg $MaxTokens -TemperatureArg $Temperature -TopPArg $TopP `
+                    -IsCold $isCold
+            } catch {
+                if (-not (Test-TransientStreamError $_)) { throw }   # real bug: surface it
+                $callError = $_
+            }
+
+            if ($null -eq $r) {
+                $reason = Get-RootExceptionMessage $callError
+                Write-Host "      call failed: $reason" -ForegroundColor Red
+                Write-Host "      Foundry backend appears to have crashed — restarting server and reloading '$model'..." -ForegroundColor Yellow
+                Restart-FoundryServer            # updates $script:ApiBase to the new port
+                Write-Host "  foundry model load $model" -ForegroundColor DarkCyan
+                foundry model load $model
+                if ($LASTEXITCODE -eq 0) {
+                    try {
+                        $r = Invoke-StreamingCompletion `
+                            -ModelId $apiModelId -Prompt $prompt -ApiBase $ApiBase `
+                            -MaxTokensArg $MaxTokens -TemperatureArg $Temperature -TopPArg $TopP `
+                            -IsCold $isCold
+                    } catch {
+                        if (-not (Test-TransientStreamError $_)) { throw }
+                        $callError = $_
+                    }
+                }
+            }
+
+            if ($null -eq $r) {
+                $reason = Get-RootExceptionMessage $callError
+                Write-Host "      crash recovery failed — abandoning '$model' and moving on: $reason" -ForegroundColor Red
+                Out-Yaml "              - call: $($i+1)"
+                Out-Yaml "                failed: true"
+                Out-Yaml "                error: $(Format-YamlString $reason)"
+                $modelCrashed = $true
+                break
+            }
 
             Out-Yaml "              - call: $($i+1)"
             Out-Yaml "                cold: $(if ($isCold) { 'true' } else { 'false' })"
@@ -854,6 +1002,8 @@ foreach ($model in $Models) {
             Out-Yaml "                topP: $TopP"
             Out-Yaml "                maxTokens: $MaxTokens"
             Out-Yaml "                prompt: $(Format-YamlString $r.Prompt)"
+            if ($r.Attempts -gt 1) { Out-Yaml "                attempts: $($r.Attempts)" }
+            if ($r.Truncated)      { Out-Yaml "                truncated: true" }
             if ($null -ne $r.PromptTokens) { Out-Yaml "                promptTokens: $($r.PromptTokens)" }
             Out-Yaml "                completionTokens: $($r.CompletionTokens)"
             if ($null -ne $r.TotalTokens)  { Out-Yaml "                totalTokens: $($r.TotalTokens)" }
@@ -886,9 +1036,10 @@ foreach ($model in $Models) {
             $cpuTxt   = if ($r.AvgCpuPct)        { "  cpu:$($r.AvgCpuPct)%/$($r.MaxCpuPct)%" } else { '' }
             $gpuTxt   = if ($r.AvgGpuPct)        { "  gpu:$($r.AvgGpuPct)%/$($r.MaxGpuPct)%" } else { '' }
             $thermTxt = if ($r.ThermalMaxCelsius) { "  $($r.ThermalMaxCelsius)°C" } else { '' }
-            Write-Host ("      TTFT:{0}s  sust:{1}t/s  total:{2}t/s  ({3}tok){4}{5}{6}" -f `
+            $truncTxt = if ($r.Truncated)         { '  [truncated]' } else { '' }
+            Write-Host ("      TTFT:{0}s  sust:{1}t/s  total:{2}t/s  ({3}tok){4}{5}{6}{7}" -f `
                 $r.TimeToFirstTokenSec, $r.SustainedTokensPerSec, $r.OverallTokensPerSec,
-                $r.CompletionTokens, $cpuTxt, $gpuTxt, $thermTxt) -ForegroundColor Green
+                $r.CompletionTokens, $cpuTxt, $gpuTxt, $thermTxt, $truncTxt) -ForegroundColor Green
         }
 
         # Run-level averages
@@ -899,6 +1050,8 @@ foreach ($model in $Models) {
             Out-Yaml "            averageSustainedTokensPerSec: $rAvgSustained"
             Write-Host ("    Run $run avg: overall {0} t/s  sustained {1} t/s" -f $rAvgOverall, $rAvgSustained) -ForegroundColor Cyan
         }
+
+        if ($modelCrashed) { break }
     }
 
     # Model-level summary (across all runs)
@@ -916,6 +1069,11 @@ foreach ($model in $Models) {
         Write-Host ""
         Write-Host ("  Model total: overall {0} t/s  sustained {1} t/s  warm {2} t/s  load {3}s" -f `
             $mAvgOverall, $mAvgSustained, $mWarm, $loadSec) -ForegroundColor Cyan
+    }
+
+    if ($modelCrashed) {
+        Out-Yaml "        completed: false"
+        Write-Host "  '$model' did not complete — results above are partial." -ForegroundColor Yellow
     }
 
     Write-Host ""
