@@ -30,6 +30,9 @@ psmodules:
       - id: powershell-yaml
         name: powershell-yaml
         required: true
+      - id: PwshSpectreConsole
+        name: PwshSpectreConsole
+        required: true
       - id: Pester
         name: Pester
         required: true

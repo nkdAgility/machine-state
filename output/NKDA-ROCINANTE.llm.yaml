@@ -1,0 +1,612 @@
+machine: NKDA-ROCINANTE
+system:
+  make: 'Microsoft Corporation Microsoft Surface Pro, 11th Edition'
+  os: Microsoft Windows 11 Business Insider Preview (Build 26300.8697)
+  cpu:
+    name: 'Snapdragon(R) X 12-core X1E80100 @ 3.40 GHz'
+    cores: 12
+    logicalProcessors: 12
+    maxMhz: 3417
+  memory:
+    totalGb: 63.5
+    sticks:
+      - '64GB 0 @ 8448MHz'
+  gpus:
+    - name: Qualcomm(R) Adreno(TM) X1-85 GPU
+      driverVersion: 31.0.137.0
+      driverDate: 2026-01-08
+  npu:
+    - Snapdragon(R) X Elite - X1E80100 - Qualcomm(R) Hexagon(TM) NPU
+sessions:
+  - sessionId: 1
+    date: 2026-06-22T08:13:24Z
+    foundryVersion: 0.10.0+174be11ea7aeacd8d0d67b0ba1daebec615284b1
+    powerPlan: Balanced
+    freeRamGbAtTest: 36
+    samplingDefaults:
+      temperature: 0.7
+      topP: 0.9
+      maxTokens: 512
+    models:
+      - id: phi-4-mini
+        loadSucceeded: true
+        loadTimeSec: 6.853
+        runs:
+          - runId: 1
+            calls:
+              - call: 1
+                cold: true
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: What is the capital of France? Answer in one sentence.
+                promptTokens: 15
+                completionTokens: 7
+                totalTokens: 22
+                totalDurationSec: 1.161
+                timeToFirstTokenSec: 0.814
+                sustainedTokensPerSec: 17.27
+                overallTokensPerSec: 6.03
+              - call: 2
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Explain the difference between RAM and a hard drive in exactly two sentences.
+                promptTokens: 17
+                completionTokens: 65
+                totalTokens: 82
+                totalDurationSec: 2.739
+                timeToFirstTokenSec: 0.395
+                sustainedTokensPerSec: 27.3
+                overallTokensPerSec: 23.73
+                utilization:
+                  sampleCount: 1
+                  avgCpuPct: 18.1
+                  maxCpuPct: 18.1
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 3
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: List five advantages and five disadvantages of using a statically typed programming language. Explain each point briefly.
+                promptTokens: 23
+                completionTokens: 416
+                totalTokens: 439
+                totalDurationSec: 15.409
+                timeToFirstTokenSec: 0.404
+                sustainedTokensPerSec: 27.66
+                overallTokensPerSec: 27
+                utilization:
+                  sampleCount: 6
+                  avgCpuPct: 12.2
+                  maxCpuPct: 22.9
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 4
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Name the three primary colours of light.
+                promptTokens: 11
+                completionTokens: 74
+                totalTokens: 85
+                totalDurationSec: 3
+                timeToFirstTokenSec: 0.38
+                sustainedTokensPerSec: 27.86
+                overallTokensPerSec: 24.67
+                utilization:
+                  sampleCount: 1
+                  avgCpuPct: 9.7
+                  maxCpuPct: 9.7
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 5
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Describe the water cycle in plain English in about two paragraphs.
+                promptTokens: 15
+                completionTokens: 234
+                totalTokens: 249
+                totalDurationSec: 8.741
+                timeToFirstTokenSec: 0.385
+                sustainedTokensPerSec: 27.89
+                overallTokensPerSec: 26.77
+                utilization:
+                  sampleCount: 3
+                  avgCpuPct: 9.6
+                  maxCpuPct: 11.8
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+            averageOverallTokensPerSec: 21.64
+            averageSustainedTokensPerSec: 25.6
+          - runId: 2
+            calls:
+              - call: 1
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: 'Describe how a binary search algorithm works in plain English, then walk through an example with a sorted list of 10 items.'
+                promptTokens: 28
+                completionTokens: 338
+                totalTokens: 366
+                totalDurationSec: 12.664
+                timeToFirstTokenSec: 0.391
+                sustainedTokensPerSec: 27.46
+                overallTokensPerSec: 26.69
+                utilization:
+                  sampleCount: 5
+                  avgCpuPct: 13.1
+                  maxCpuPct: 23.2
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 2
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: What does CPU stand for?
+                promptTokens: 9
+                completionTokens: 127
+                totalTokens: 136
+                totalDurationSec: 4.891
+                timeToFirstTokenSec: 0.393
+                sustainedTokensPerSec: 28.01
+                overallTokensPerSec: 25.97
+                utilization:
+                  sampleCount: 2
+                  avgCpuPct: 11
+                  maxCpuPct: 12.6
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 3
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: What are the three laws of thermodynamics? Give a one-line example of each.
+                promptTokens: 20
+                completionTokens: 213
+                totalTokens: 233
+                totalDurationSec: 8.155
+                timeToFirstTokenSec: 0.384
+                sustainedTokensPerSec: 27.28
+                overallTokensPerSec: 26.12
+                utilization:
+                  sampleCount: 3
+                  avgCpuPct: 9.7
+                  maxCpuPct: 14.4
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 4
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: 'Write a detailed haiku collection about software development — five haiku, each with a brief explanation of what it represents.'
+                promptTokens: 27
+                completionTokens: 319
+                totalTokens: 346
+                totalDurationSec: 12.148
+                timeToFirstTokenSec: 0.382
+                sustainedTokensPerSec: 27.03
+                overallTokensPerSec: 26.26
+                utilization:
+                  sampleCount: 4
+                  avgCpuPct: 12.3
+                  maxCpuPct: 20
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 5
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Who wrote Romeo and Juliet?
+                promptTokens: 9
+                completionTokens: 61
+                totalTokens: 70
+                totalDurationSec: 2.611
+                timeToFirstTokenSec: 0.39
+                sustainedTokensPerSec: 27.02
+                overallTokensPerSec: 23.36
+                utilization:
+                  sampleCount: 1
+                  avgCpuPct: 11.9
+                  maxCpuPct: 11.9
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+            averageOverallTokensPerSec: 25.68
+            averageSustainedTokensPerSec: 27.36
+          - runId: 3
+            calls:
+              - call: 1
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Explain what an API is as if explaining to a 10-year-old. Use about 150 words.
+                promptTokens: 24
+                completionTokens: 130
+                totalTokens: 154
+                totalDurationSec: 5.089
+                timeToFirstTokenSec: 0.382
+                sustainedTokensPerSec: 27.4
+                overallTokensPerSec: 25.54
+                utilization:
+                  sampleCount: 2
+                  avgCpuPct: 14.6
+                  maxCpuPct: 20.2
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 2
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: 'Explain the OSI model layers. For each layer, name it, describe its role, and give a real-world protocol example.'
+                promptTokens: 29
+                completionTokens: 489
+                totalTokens: 518
+                totalDurationSec: 18.337
+                timeToFirstTokenSec: 0.403
+                sustainedTokensPerSec: 27.21
+                overallTokensPerSec: 26.67
+                utilization:
+                  sampleCount: 7
+                  avgCpuPct: 13.6
+                  maxCpuPct: 24.7
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 3
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: What is 2 to the power of 10?
+                promptTokens: 14
+                completionTokens: 12
+                totalTokens: 26
+                totalDurationSec: 0.816
+                timeToFirstTokenSec: 0.388
+                sustainedTokensPerSec: 25.73
+                overallTokensPerSec: 14.71
+              - call: 4
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Summarise the plot of Romeo and Juliet. Be concise but cover the key events.
+                promptTokens: 21
+                completionTokens: 141
+                totalTokens: 162
+                totalDurationSec: 5.575
+                timeToFirstTokenSec: 0.382
+                sustainedTokensPerSec: 26.96
+                overallTokensPerSec: 25.29
+                utilization:
+                  sampleCount: 2
+                  avgCpuPct: 10.2
+                  maxCpuPct: 12.5
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 5
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: 'Compare REST and GraphQL APIs. Cover design philosophy, use cases, pros, cons, and give a concrete example request for each.'
+                promptTokens: 30
+                completionTokens: 512
+                totalTokens: 542
+                totalDurationSec: 19.614
+                timeToFirstTokenSec: 0.38
+                sustainedTokensPerSec: 26.57
+                overallTokensPerSec: 26.1
+                utilization:
+                  sampleCount: 7
+                  avgCpuPct: 11.4
+                  maxCpuPct: 16
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+            averageOverallTokensPerSec: 23.66
+            averageSustainedTokensPerSec: 26.77
+        averageOverallTokensPerSec: 23.66
+        averageSustainedTokensPerSec: 26.58
+        averageWarmOverallTokensPerSec: 24.92
+  - sessionId: 2
+    date: 2026-06-22T08:31:14Z
+    foundryVersion: 0.10.0+174be11ea7aeacd8d0d67b0ba1daebec615284b1
+    powerPlan: Balanced
+    freeRamGbAtTest: 34.2
+    samplingDefaults:
+      temperature: 0.7
+      topP: 0.9
+      maxTokens: 512
+    models:
+      - id: mistral-7b-v0.2
+        loadSucceeded: true
+        loadTimeSec: 5.274
+        runs:
+          - runId: 1
+            calls:
+              - call: 1
+                cold: true
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: What is the capital of France? Answer in one sentence.
+                promptTokens: 20
+                completionTokens: 8
+                totalTokens: 28
+                totalDurationSec: 3.378
+                timeToFirstTokenSec: 2.089
+                sustainedTokensPerSec: 5.43
+                overallTokensPerSec: 2.37
+                utilization:
+                  sampleCount: 1
+                  avgCpuPct: 20.2
+                  maxCpuPct: 20.2
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 2
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Explain the difference between RAM and a hard drive in exactly two sentences.
+                promptTokens: 23
+                completionTokens: 71
+                totalTokens: 94
+                totalDurationSec: 12.096
+                timeToFirstTokenSec: 1.627
+                sustainedTokensPerSec: 6.69
+                overallTokensPerSec: 5.87
+                utilization:
+                  sampleCount: 4
+                  avgCpuPct: 19.2
+                  maxCpuPct: 21
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 3
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: List five advantages and five disadvantages of using a statically typed programming language. Explain each point briefly.
+                promptTokens: 31
+                completionTokens: 512
+                totalTokens: 543
+                totalDurationSec: 77.636
+                timeToFirstTokenSec: 1.615
+                sustainedTokensPerSec: 6.72
+                overallTokensPerSec: 6.59
+                utilization:
+                  sampleCount: 30
+                  avgCpuPct: 7.1
+                  maxCpuPct: 11.5
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 4
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Name the three primary colours of light.
+                promptTokens: 16
+                completionTokens: 41
+                totalTokens: 57
+                totalDurationSec: 7.101
+                timeToFirstTokenSec: 1.064
+                sustainedTokensPerSec: 6.63
+                overallTokensPerSec: 5.77
+                utilization:
+                  sampleCount: 2
+                  avgCpuPct: 5.8
+                  maxCpuPct: 5.9
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 5
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Describe the water cycle in plain English in about two paragraphs.
+                promptTokens: 21
+                completionTokens: 177
+                totalTokens: 198
+                totalDurationSec: 27.802
+                timeToFirstTokenSec: 1.612
+                sustainedTokensPerSec: 6.72
+                overallTokensPerSec: 6.37
+                utilization:
+                  sampleCount: 10
+                  avgCpuPct: 5.8
+                  maxCpuPct: 7.4
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+            averageOverallTokensPerSec: 5.39
+            averageSustainedTokensPerSec: 6.44
+          - runId: 2
+            calls:
+              - call: 1
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: 'Describe how a binary search algorithm works in plain English, then walk through an example with a sorted list of 10 items.'
+                promptTokens: 34
+                completionTokens: 512
+                totalTokens: 546
+                totalDurationSec: 78.717
+                timeToFirstTokenSec: 2.102
+                sustainedTokensPerSec: 6.67
+                overallTokensPerSec: 6.5
+                utilization:
+                  sampleCount: 29
+                  avgCpuPct: 18.4
+                  maxCpuPct: 67.2
+                  avgGpuPct: 3.9
+                  maxGpuPct: 99
+              - call: 2
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: What does CPU stand for?
+                promptTokens: 14
+                completionTokens: 36
+                totalTokens: 50
+                totalDurationSec: 6.306
+                timeToFirstTokenSec: 0.986
+                sustainedTokensPerSec: 6.58
+                overallTokensPerSec: 5.71
+                utilization:
+                  sampleCount: 2
+                  avgCpuPct: 14.8
+                  maxCpuPct: 21.3
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 3
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: What are the three laws of thermodynamics? Give a one-line example of each.
+                promptTokens: 27
+                completionTokens: 512
+                totalTokens: 539
+                totalDurationSec: 78.314
+                timeToFirstTokenSec: 1.587
+                sustainedTokensPerSec: 6.66
+                overallTokensPerSec: 6.54
+                utilization:
+                  sampleCount: 30
+                  avgCpuPct: 9.4
+                  maxCpuPct: 21.8
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 4
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: 'Write a detailed haiku collection about software development — five haiku, each with a brief explanation of what it represents.'
+                promptTokens: 32
+                completionTokens: 470
+                totalTokens: 502
+                totalDurationSec: 71.386
+                timeToFirstTokenSec: 1.646
+                sustainedTokensPerSec: 6.72
+                overallTokensPerSec: 6.58
+                utilization:
+                  sampleCount: 27
+                  avgCpuPct: 9
+                  maxCpuPct: 20.4
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 5
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Who wrote Romeo and Juliet?
+                promptTokens: 16
+                completionTokens: 117
+                totalTokens: 133
+                totalDurationSec: 18.34
+                timeToFirstTokenSec: 0.996
+                sustainedTokensPerSec: 6.69
+                overallTokensPerSec: 6.38
+                utilization:
+                  sampleCount: 7
+                  avgCpuPct: 8.5
+                  maxCpuPct: 15.6
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+            averageOverallTokensPerSec: 6.34
+            averageSustainedTokensPerSec: 6.66
+          - runId: 3
+            calls:
+              - call: 1
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Explain what an API is as if explaining to a 10-year-old. Use about 150 words.
+                promptTokens: 35
+                completionTokens: 88
+                totalTokens: 123
+                totalDurationSec: 15.261
+                timeToFirstTokenSec: 2.097
+                sustainedTokensPerSec: 6.61
+                overallTokensPerSec: 5.77
+                utilization:
+                  sampleCount: 6
+                  avgCpuPct: 5.2
+                  maxCpuPct: 7.6
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 2
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: 'Explain the OSI model layers. For each layer, name it, describe its role, and give a real-world protocol example.'
+                promptTokens: 36
+                completionTokens: 512
+                totalTokens: 548
+                totalDurationSec: 78.931
+                timeToFirstTokenSec: 2.115
+                sustainedTokensPerSec: 6.65
+                overallTokensPerSec: 6.49
+                utilization:
+                  sampleCount: 30
+                  avgCpuPct: 6.7
+                  maxCpuPct: 13.9
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 3
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: What is 2 to the power of 10?
+                promptTokens: 20
+                completionTokens: 113
+                totalTokens: 133
+                totalDurationSec: 18.358
+                timeToFirstTokenSec: 1.589
+                sustainedTokensPerSec: 6.68
+                overallTokensPerSec: 6.16
+                utilization:
+                  sampleCount: 7
+                  avgCpuPct: 10.9
+                  maxCpuPct: 23.2
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
+              - call: 4
+                cold: false
+                temperature: 0.7
+                topP: 0.9
+                maxTokens: 512
+                prompt: Summarise the plot of Romeo and Juliet. Be concise but cover the key events.
+                promptTokens: 29
+                completionTokens: 136
+                totalTokens: 165
+                totalDurationSec: 21.786
+                timeToFirstTokenSec: 1.607
+                sustainedTokensPerSec: 6.69
+                overallTokensPerSec: 6.24
+                utilization:
+                  sampleCount: 8
+                  avgCpuPct: 7.2
+                  maxCpuPct: 10.4
+                  avgGpuPct: 0.5
+                  maxGpuPct: 0.5
