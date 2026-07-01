@@ -1,0 +1,45 @@
+name: NKDA-TACHI
+platform: win
+architecture: x64
+
+git:
+  cloneRoot: "%USERPROFILE%\\source\\repos"
+
+state:
+  - ../win/windows-common.yaml
+  - ../win/windows-x64.yaml
+  - ../common-personal.yaml
+  - ../win/windows-base.yaml
+  - ../common-base.yaml
+
+exclusions:
+  packages:
+    winget: []
+    msstore: []
+
+winget:
+  packages:
+    winget:
+      []
+
+    msstore:
+      []
+
+# Foundry Local models — Intel Iris Xe (integrated graphics), 32 GB RAM. No discrete
+# GPU, so inference is CPU/iGPU-bound: keep to 3-4B models for usable throughput.
+# Anything larger would load but crawl, so it is deliberately excluded.
+foundry:
+  packages:
+    foundry:
+      - id: phi-4-mini
+        name: phi-4-mini
+        required: true
+      - id: qwen3-4b
+        name: qwen3-4b
+        required: true
+      - id: smollm3-3b
+        name: smollm3-3b
+        required: true
+      - id: ministral-3-3b-instruct-2512
+        name: ministral-3-3b-instruct-2512
+        required: true
