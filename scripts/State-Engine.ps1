@@ -460,6 +460,20 @@ function Merge-GitRepos {
     return $result
 }
 
+function Get-GitIdentity {
+    param(
+        [AllowNull()]
+        [object]$StateObject
+    )
+
+    if ($null -eq $StateObject) { return $null }
+
+    $gitNode = Get-ObjectValue -Object $StateObject -Name "git"
+    if (-not $gitNode) { return $null }
+
+    return Get-ObjectValue -Object $gitNode -Name "identity"
+}
+
 function Merge-MachineState {
     param(
         [Parameter(Mandatory)]
@@ -481,6 +495,7 @@ function Merge-MachineState {
     $setupGit          = @()
     $dotnetToolPackages = @()
     $psmodulePackages  = @()
+    $gitIdentity       = $null
 
     foreach ($relativePath in @($machineState.state)) {
         $resolvedSharedPath = Join-Path (Split-Path -Parent $MachineStatePath) $relativePath
@@ -497,6 +512,9 @@ function Merge-MachineState {
         $gitRepos           += @(Get-GitRepos -StateObject $sharedState)
         $setupWindows       += @(Get-SetupTopicIds -StateObject $sharedState -Topic "windows")
         $setupGit           += @(Get-SetupTopicIds -StateObject $sharedState -Topic "git")
+
+        $sharedIdentity = Get-GitIdentity -StateObject $sharedState
+        if ($sharedIdentity) { $gitIdentity = $sharedIdentity }
     }
 
     $stateObjects += $machineState
@@ -511,6 +529,9 @@ function Merge-MachineState {
     $gitRepos           += @(Get-GitRepos -StateObject $machineState)
     $setupWindows       += @(Get-SetupTopicIds -StateObject $machineState -Topic "windows")
     $setupGit           += @(Get-SetupTopicIds -StateObject $machineState -Topic "git")
+
+    $machineIdentity = Get-GitIdentity -StateObject $machineState
+    if ($machineIdentity) { $gitIdentity = $machineIdentity }
 
     # cloneRoot is machine-specific — read from machine YAML only
     $machineGitNode = Get-ObjectValue -Object $machineState -Name "git"
@@ -641,6 +662,12 @@ function Merge-MachineState {
         }
         git          = [ordered]@{
             cloneRoot = $cloneRoot
+            identity  = if ($gitIdentity) {
+                [ordered]@{
+                    name  = [string](Get-ObjectValue -Object $gitIdentity -Name "name")
+                    email = [string](Get-ObjectValue -Object $gitIdentity -Name "email")
+                }
+            } else { $null }
             repos     = $mergedGitRepos
         }
         setup        = [ordered]@{

@@ -86,6 +86,9 @@ workPackages:
       - "%USERPROFILE%\\source\\repos\\Hinshelwood.com"
 
 git:
+  identity:
+    name: Martin Hinshelwood
+    email: martin@nkdagility.com
   repos:
     - url: https://github.com/nkdAgility/engage-system
     - url: https://github.com/nkdAgility/NKDAgility.com

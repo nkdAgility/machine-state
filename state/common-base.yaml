@@ -23,6 +23,8 @@ setup:
     - editor-vscode
     - diff-tool-vscode
     - merge-tool-vscode
+    - user-name
+    - user-email
 
 psmodules:
   packages:

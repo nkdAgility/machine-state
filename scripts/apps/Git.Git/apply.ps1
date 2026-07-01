@@ -16,7 +16,46 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     return
 }
 
+function Get-SafeProperty {
+    param([object]$Object, [string]$Name)
+    if ($null -eq $Object) { return $null }
+    $prop = $Object.PSObject.Properties[$Name]
+    if ($prop) { return $prop.Value }
+    return $null
+}
+
+function Get-GitIdentity {
+    # Reads git.identity.name/email from merged state - absent on machines
+    # (e.g. client-default) that don't declare a personal identity.
+    if (-not (Test-Path -LiteralPath $Context.MergedStateJson)) {
+        return [pscustomobject]@{ Name = $null; Email = $null }
+    }
+    $mergedState = Get-Content -LiteralPath $Context.MergedStateJson -Raw | ConvertFrom-Json
+    $gitNode = Get-SafeProperty $mergedState 'git'
+    $identityNode = Get-SafeProperty $gitNode 'identity'
+    return [pscustomobject]@{
+        Name  = Get-SafeProperty $identityNode 'name'
+        Email = Get-SafeProperty $identityNode 'email'
+    }
+}
+
+$identity = Get-GitIdentity
+
 $catalog = @(
+    @{
+        Id            = "user-name"
+        Name          = "Git user.name"
+        RequiresAdmin = $false
+        Check         = { if (-not $identity.Name) { return $true }; (& git config --global user.name 2>$null) -eq $identity.Name }
+        Apply         = { & git config --global user.name $identity.Name }
+    }
+    @{
+        Id            = "user-email"
+        Name          = "Git user.email"
+        RequiresAdmin = $false
+        Check         = { if (-not $identity.Email) { return $true }; (& git config --global user.email 2>$null) -eq $identity.Email }
+        Apply         = { & git config --global user.email $identity.Email }
+    }
     @{
         Id            = "default-branch"
         Name          = "Git default branch name (main)"
