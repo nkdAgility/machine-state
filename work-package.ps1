@@ -166,44 +166,53 @@ if (Get-Command code -ErrorAction SilentlyContinue) {
     Write-Warning "'code' not found on PATH — skipping VS Code. In VS Code run 'Shell Command: Install code command in PATH'."
 }
 
-# Refresh the terminal: Windows Terminal exposes no API to enumerate or dedupe tabs,
-# so re-running a package would otherwise stack duplicate tabs. Instead, when the package
-# owns a virtual desktop, close any WT windows already on that desktop (scoped via
-# Test-Window so other terminals are untouched) and recreate a clean one below. Without a
-# desktop we can't reliably identify the package's window, so we skip the refresh.
-if ($desktop) {
-    try {
-        $stale = @(
-            Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue |
-                Where-Object { $_.MainWindowHandle -ne 0 -and (Test-Window -Desktop $desktop -Hwnd $_.MainWindowHandle) }
-        )
-        foreach ($proc in $stale) { [void]$proc.CloseMainWindow() }
-        if ($stale.Count -gt 0) {
-            Start-Sleep -Milliseconds 400
-            # Force-close any that ignored the graceful request (e.g. a close-confirmation prompt).
-            $stale | Where-Object { -not $_.HasExited } | Stop-Process -Force -ErrorAction SilentlyContinue
-            Write-Host "  Windows Terminal: refreshed ($($stale.Count) existing window(s) closed)"
-        }
-    }
-    catch {
-        Write-Warning "Could not refresh existing Windows Terminal windows ($($_.Exception.Message)). Continuing."
-    }
+# Idempotent tabs: Windows Terminal has no API to enumerate tabs, but every tab this
+# launcher opens hosts a pwsh process whose command line carries a marker
+# (NKD_WP='<package-id>|<repo>'). The shell dies with its tab, so the live pwsh
+# command lines are an exact registry of which repo tabs are already open — nothing
+# cached, so nothing to go stale, and no PID-reuse hazard.
+$openRepos = @()
+try {
+    $openRepos = @(
+        Get-CimInstance -ClassName Win32_Process -Filter "Name = 'pwsh.exe'" -ErrorAction Stop |
+            ForEach-Object {
+                if ($_.CommandLine -and
+                    $_.CommandLine -match "NKD_WP='([^|']+)\|([^']+)'" -and
+                    $Matches[1] -eq $Name) {
+                    $Matches[2]
+                }
+            }
+    )
+}
+catch {
+    Write-Warning "Could not query existing terminal tabs ($($_.Exception.Message)). Duplicate tabs are possible."
 }
 
-# Open a single Windows Terminal window with one named tab per repo.
-if (Get-Command wt -ErrorAction SilentlyContinue) {
+$missing = @($present | Where-Object { $openRepos -notcontains $_ })
+
+# Open only the missing tabs, appended to the package's named window (`wt -w <id>`
+# reuses a window with that name and only creates one if absent). The marker is also
+# set as an env var, so a tab's shell knows which package/repo it belongs to.
+# Assumes a pwsh-based terminal profile (this repo is PowerShell-only).
+if ($missing.Count -eq 0) {
+    Write-Host "  wt: all $($present.Count) tab(s) already open in window '$Name'"
+} elseif (Get-Command wt -ErrorAction SilentlyContinue) {
     $wtArgs = [System.Collections.Generic.List[string]]::new()
+    $wtArgs.Add('-w'); $wtArgs.Add($Name)
     $first = $true
-    foreach ($repo in $present) {
+    foreach ($repo in $missing) {
         $title = Split-Path -Path $repo -Leaf
         if (-not $first) { $wtArgs.Add(';') }   # wt tab separator (passed as its own argv token)
         $wtArgs.Add('new-tab')
         $wtArgs.Add('--profile'); $wtArgs.Add($terminalProfile)
         $wtArgs.Add('--title');   $wtArgs.Add($title)
         $wtArgs.Add('-d');        $wtArgs.Add($repo)
+        $wtArgs.Add('pwsh'); $wtArgs.Add('-NoExit'); $wtArgs.Add('-Command')
+        $wtArgs.Add("`$env:NKD_WP='$Name|$repo'")
         $first = $false
     }
-    Write-Host "  wt (opening $($present.Count) tabs)"
+    $reused = $present.Count - $missing.Count
+    Write-Host "  wt: opening $($missing.Count) tab(s) in window '$Name'$(if ($reused) { ", $reused already open" })"
     & wt @wtArgs
 } else {
     Write-Warning "'wt' (Windows Terminal) not found on PATH — skipping terminal tabs."

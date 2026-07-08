@@ -276,13 +276,17 @@ PSGallery module (declared under `psmodules:` in `state/win/windows-common.yaml`
 module is missing or the Windows build is unsupported, the launcher warns and opens on the
 current desktop instead — it never blocks the launch.
 
-Re-running a package is idempotent on a best-effort basis. **VS Code** dedupes natively —
-`code <folder>` focuses an already-open window instead of opening a duplicate. **Windows
-Terminal** has no API to enumerate or merge tabs, so when `desktop: true` the launcher
-*refreshes* the terminal instead: it closes any WT windows already on the package's desktop
-(scoped via `Test-Window`, so unrelated terminals are left alone) and opens a fresh one.
-Without a desktop there's no reliable way to identify the package's window, so the refresh
-is skipped and a new window is opened each run.
+Re-running a package is idempotent. **VS Code** dedupes natively — `code <folder>`
+focuses an already-open window instead of opening a duplicate. **Windows Terminal** has
+no API to enumerate tabs, so the launcher makes tabs self-identifying instead: each tab
+runs `pwsh` with a marker in its command line (`NKD_WP='<package-id>|<repo>'`, also set
+as an env var inside the tab, so any shell can tell which package/repo it belongs to).
+The shell process dies with its tab, so querying live `pwsh` command lines via
+`Win32_Process` yields an exact, grouped-by-package list of open tabs — no cache to go
+stale, no PID-reuse hazard. Only the missing repo tabs are opened, appended to the
+package's named window (`wt -w <package-id>`, which reuses an existing window of that
+name and creates it only if absent). Closing a tab kills its shell, so that repo's tab
+is recreated on the next run; if every tab is already open the `wt` call is skipped.
 
 ### `publish-secrets.ps1`
 
