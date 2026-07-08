@@ -78,7 +78,6 @@ workPackages:
   - id: website
     name: NKDAgility Websites
     terminalProfile: PowerShell
-    desktop: true                      # open on a virtual desktop named after `name`
     repos:
       - "%USERPROFILE%\\source\\repos\\NKDAgility.com"
       - "%USERPROFILE%\\source\\repos\\NKDAgility.com-content"
