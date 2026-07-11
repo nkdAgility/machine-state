@@ -1,5 +1,15 @@
 # machine-state — Guidance for LLM Contributors
 
+## Non-Negotiable Rules
+
+- **Never push unless there is a confirmed working solution.** A solution is confirmed when either you or the user has verified it works. Never push speculatively, never push to ask the user to test it, never push and hope.
+
+
+
+## Non-Negotiable Rules
+
+- **Never push unless you have verified the solution works.** Test it yourself before committing and pushing. Do not push speculatively, do not push and ask the user to test, do not push and hope. If you cannot test it, say so and wait for confirmation before pushing.
+
 ## Core Model
 
 ```
