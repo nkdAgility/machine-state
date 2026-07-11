@@ -188,7 +188,10 @@ function New-WingetSourceBlock {
 
 switch ($Stage) {
     "Export" {
-        Assert-WingetAvailable
+        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+            Write-Warning "winget not found on PATH - skipping Winget export"
+            return
+        }
         New-DirectoryIfMissing -Path $Context.ExportPath
 
         if ($PSCmdlet.ShouldProcess((Join-Path $Context.ExportPath "winget.export.json"), "Export Winget state")) {

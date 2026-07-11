@@ -17,7 +17,10 @@ $ErrorActionPreference = "Stop"
 
 switch ($Stage) {
     "Export" {
-        Install-ToolIfMissing -Command uv -WingetId astral-sh.uv -DisplayName "uv"
+        if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+            Write-Warning "uv not found on PATH - skipping uv export"
+            return
+        }
         New-DirectoryIfMissing -Path $Context.ExportPath
 
         $exportModel = [ordered]@{
@@ -68,7 +71,7 @@ switch ($Stage) {
             $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Context.ExportPath "uv.tools.export.json") -Encoding UTF8
         }
 
-        Write-Host "$($exportModel.packages.Count) uv tool(s) installed"
+        Write-Host "$($exportModel.packages.Count) uv tool(s) found"
     }
 
     "Build" {

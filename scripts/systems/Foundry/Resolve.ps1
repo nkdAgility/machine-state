@@ -49,7 +49,10 @@ function Get-CachedFoundryAliases {
 
 switch ($Stage) {
     "Export" {
-        Install-ToolIfMissing -Command foundry -WingetId Microsoft.FoundryLocal -DisplayName "Foundry Local"
+        if (-not (Get-Command foundry -ErrorAction SilentlyContinue)) {
+            Write-Warning "foundry not found on PATH - skipping Foundry export"
+            return
+        }
         New-DirectoryIfMissing -Path $Context.ExportPath
 
         $exportModel = [ordered]@{
@@ -61,7 +64,7 @@ switch ($Stage) {
             $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Context.ExportPath "foundry.models.export.json") -Encoding UTF8
         }
 
-        Write-Host "$($exportModel.models.Count) Foundry model(s) cached"
+        Write-Host "$($exportModel.models.Count) Foundry model(s) found"
     }
 
     "Build" {
