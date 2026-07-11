@@ -43,8 +43,15 @@ function New-DirectoryIfMissing {
 }
 
 function Invoke-RefreshPath {
-    $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" +
-                [System.Environment]::GetEnvironmentVariable("PATH", "User")
+    $machinePath = [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
+    $userPath    = [System.Environment]::GetEnvironmentVariable("PATH", "User")
+    $registryEntries = ($machinePath + ";" + $userPath) -split ';' | Where-Object { $_ }
+
+    # Preserve AppX/WindowsApps entries injected by the Windows shell at login —
+    # these are not stored in the registry and would be lost if we replaced PATH wholesale.
+    $appxEntries = $env:PATH -split ';' | Where-Object { $_ -like '*\WindowsApps\*' -and $registryEntries -notcontains $_ }
+
+    $env:PATH = (($registryEntries + $appxEntries) -join ';')
 }
 
 function Add-ManualAction {
