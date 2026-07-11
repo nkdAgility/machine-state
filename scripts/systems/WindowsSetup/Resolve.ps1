@@ -180,6 +180,24 @@ $catalog = @(
     }
 
     @{
+        Id            = "localappdata-windowsapps-path"
+        Name          = "LocalAppData\Microsoft\WindowsApps on system PATH (ensures winget and AppX tools are always available)"
+        RequiresAdmin = $true
+        Check         = {
+            $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine') -split ';'
+            $machinePath -contains '%LOCALAPPDATA%\Microsoft\WindowsApps'
+        }
+        Apply         = {
+            $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+            $parts = @($machinePath -split ';' | Where-Object { $_ })
+            if ($parts -notcontains '%LOCALAPPDATA%\Microsoft\WindowsApps') {
+                $parts += '%LOCALAPPDATA%\Microsoft\WindowsApps'
+                [Environment]::SetEnvironmentVariable('Path', ($parts -join ';'), 'Machine')
+            }
+        }
+    }
+
+    @{
         Id            = "machine-state-path"
         Name          = "machine-state repo root on user PATH (enables root-level scripts e.g. work-package.ps1)"
         RequiresAdmin = $false
