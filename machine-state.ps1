@@ -31,6 +31,14 @@ $MachineStateVersion = "1.1.0"
 
 Write-Host "machine-state v$MachineStateVersion" -ForegroundColor Green
 
+# AppX tools (winget, etc.) live in %LOCALAPPDATA%\Microsoft\WindowsApps which is
+# injected by the Windows shell at login but absent in some launch contexts (e.g.
+# Explorer shortcuts). Ensure it is present before any resolver runs.
+$windowsAppsPath = "$env:LOCALAPPDATA\Microsoft\WindowsApps"
+if (($env:PATH -split ';') -notcontains $windowsAppsPath) {
+    $env:PATH = "$env:PATH;$windowsAppsPath"
+}
+
 if ($VerboseOutput) {
     $VerbosePreference = "Continue"
 }
