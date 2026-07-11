@@ -43,7 +43,7 @@ switch ($Stage) {
             $exportModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $exportPath -Encoding UTF8
         }
 
-        Write-Host "$($installed.Count) PowerShell module(s) installed via PSGallery"
+        Write-Host "$($installed.Count) PowerShell module(s) found via PSGallery"
     }
 
     "Build" {

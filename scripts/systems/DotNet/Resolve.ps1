@@ -46,7 +46,7 @@ switch ($Stage) {
             $exportModel | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $exportPath -Encoding UTF8
         }
 
-        Write-Host "$($tools.Count) dotnet global tool(s) installed"
+        Write-Host "$($tools.Count) dotnet global tool(s) found"
     }
 
     "Build" {
