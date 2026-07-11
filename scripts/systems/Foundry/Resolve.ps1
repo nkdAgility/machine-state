@@ -60,6 +60,8 @@ switch ($Stage) {
         if ($PSCmdlet.ShouldProcess((Join-Path $Context.ExportPath "foundry.models.export.json"), "Export Foundry models")) {
             $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Context.ExportPath "foundry.models.export.json") -Encoding UTF8
         }
+
+        Write-Host "$($exportModel.models.Count) Foundry model(s) cached"
     }
 
     "Build" {

@@ -42,6 +42,8 @@ switch ($Stage) {
         if ($PSCmdlet.ShouldProcess((Join-Path $Context.ExportPath "node.npm.export.json"), "Export npm global packages")) {
             $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Context.ExportPath "node.npm.export.json") -Encoding UTF8
         }
+
+        Write-Host "$($deps.Count) npm global package(s) installed"
     }
 
     "Build" {

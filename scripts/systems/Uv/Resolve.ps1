@@ -67,6 +67,8 @@ switch ($Stage) {
         if ($PSCmdlet.ShouldProcess((Join-Path $Context.ExportPath "uv.tools.export.json"), "Export uv tools")) {
             $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Context.ExportPath "uv.tools.export.json") -Encoding UTF8
         }
+
+        Write-Host "$($exportModel.packages.Count) uv tool(s) installed"
     }
 
     "Build" {
