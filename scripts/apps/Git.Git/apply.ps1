@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "..\..\Setup-Engine.ps1")
 
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+if (-not (where.exe git 2>$null)) {
     Write-Warning "git not found on PATH - skipping configuration"
     return
 }

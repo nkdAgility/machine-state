@@ -19,7 +19,7 @@ $catalog = @(
         Name          = "NkdAgility Secrets (1Password)"
         RequiresAdmin = $false
         Check         = {
-            if (-not (Get-Command op -ErrorAction SilentlyContinue)) {
+            if (-not (where.exe op 2>$null)) {
                 Write-Warning "1Password CLI (op) not found — skipping secrets. Install AgileBits.1Password.CLI via winget."
                 return $true
             }

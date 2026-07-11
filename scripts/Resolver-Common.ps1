@@ -131,7 +131,7 @@ function Install-ToolIfMissing {
         [string]$DisplayName
     )
 
-    if (Get-Command $Command -ErrorAction SilentlyContinue) { return }
+    if (where.exe $Command 2>$null) { return }
 
     Write-Host "$DisplayName not found - installing via winget..."
     & winget install --id $WingetId --accept-package-agreements --accept-source-agreements
@@ -141,7 +141,7 @@ function Install-ToolIfMissing {
 
     Invoke-RefreshPath
 
-    if (-not (Get-Command $Command -ErrorAction SilentlyContinue)) {
+    if (-not (where.exe $Command 2>$null)) {
         throw "$DisplayName still not found on PATH after installing. Open a new terminal and re-run."
     }
 }

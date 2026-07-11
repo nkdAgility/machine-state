@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 
 switch ($Stage) {
     "Export" {
-        if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+        if (-not (where.exe uv 2>$null)) {
             Write-Warning "uv not found on PATH - skipping uv export"
             return
         }

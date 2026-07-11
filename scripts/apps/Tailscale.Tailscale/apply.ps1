@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "..\..\Setup-Engine.ps1")
 
-if (-not (Get-Command tailscale -ErrorAction SilentlyContinue)) {
+if (-not (where.exe tailscale 2>$null)) {
     Write-Warning "  [tailscale] tailscale not found on PATH - skipping configuration"
     return
 }

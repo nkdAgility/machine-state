@@ -43,7 +43,7 @@ switch ($Stage) {
             $exportModel | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Context.ExportPath "node.npm.export.json") -Encoding UTF8
         }
 
-        Write-Host "$($deps.Count) npm global package(s) installed"
+        Write-Host "$($deps.Count) npm global package(s) found"
     }
 
     "Build" {
@@ -76,7 +76,7 @@ switch ($Stage) {
         }
 
         # Detect outdated npm packages (filtered to desired packages) - skip if npm not available yet
-        if (Get-Command npm -ErrorAction SilentlyContinue) {
+        if (where.exe npm 2>$null) {
             Write-Host "Checking for npm updates..."
             $upgradesPath = Join-Path $Context.BuildPath "node.upgrades.json"
             $outdatedRaw = & npm outdated -g --json 2>$null

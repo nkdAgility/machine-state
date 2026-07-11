@@ -56,7 +56,7 @@ function Invoke-AllAppResolvers {
 }
 
 function Assert-WingetAvailable {
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    if (-not (where.exe winget 2>$null)) {
         throw "Winget was not found on PATH. Install Winget before running stage '$Stage'."
     }
 }
@@ -104,7 +104,7 @@ function Get-WingetInstalledIds {
 }
 
 function Get-WingetVersion {
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    if (-not (where.exe winget 2>$null)) {
         return $null
     }
 
@@ -188,7 +188,7 @@ function New-WingetSourceBlock {
 
 switch ($Stage) {
     "Export" {
-        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        if (-not (where.exe winget 2>$null)) {
             Write-Warning "winget not found on PATH - skipping Winget export"
             return
         }

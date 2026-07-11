@@ -49,7 +49,7 @@ function Get-CachedFoundryAliases {
 
 switch ($Stage) {
     "Export" {
-        if (-not (Get-Command foundry -ErrorAction SilentlyContinue)) {
+        if (-not (where.exe foundry 2>$null)) {
             Write-Warning "foundry not found on PATH - skipping Foundry export"
             return
         }

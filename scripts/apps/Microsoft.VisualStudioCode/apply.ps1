@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "..\..\Resolver-Common.ps1")
 
-if (-not (Get-Command code -ErrorAction SilentlyContinue)) {
+if (-not (where.exe code 2>$null)) {
     Write-Host "  [vscode] VS Code not found on PATH - skipping."
     return
 }
