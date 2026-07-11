@@ -438,6 +438,9 @@ winget:
       - id: Spotify.Spotify
         name: Spotify.Spotify
         manual: true
+      - id: Tailscale.Tailscale
+        name: Tailscale.Tailscale
+        required: true
       - id: TeamViewer.TeamViewer
         name: TeamViewer.TeamViewer
         required: true
