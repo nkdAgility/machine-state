@@ -83,6 +83,7 @@ workPackages:
       - "%USERPROFILE%\\source\\repos\\NKDAgility.com-content"
       - "%USERPROFILE%\\source\\repos\\NKDAgility.com-training"
       - "%USERPROFILE%\\source\\repos\\Hinshelwood.com"
+      - "%USERPROFILE%\\source\\repos\\Hinshelwood.com-Engineering"
 
 git:
   identity:
